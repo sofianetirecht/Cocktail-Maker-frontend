@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Cocktail Maker",
+    "slug": "cocktail-maker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/cocktail.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2a0b2e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bannersoso.cocktailmaker",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.bannersoso.cocktailmaker",
+      "softwareKeyboardLayoutMode": "pan",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/cocktail.png",
+        "backgroundColor": "#2a0b2e"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ab29446b-c75b-4c5a-8f3e-05068d62d2f2"
+      }
+    }
+  }
+}
