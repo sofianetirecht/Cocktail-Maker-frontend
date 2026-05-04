@@ -4,8 +4,9 @@ import { persistStore, persistReducer } from "redux-persist";
 import { combineReducers } from "redux";
 
 import favorites from "./favorites";
+import user from "./user";
 
-const reducers = combineReducers({ favorites });
+const reducers = combineReducers({ favorites, user });
 
 const persistConfig = {
   key: "cocktailmaker",

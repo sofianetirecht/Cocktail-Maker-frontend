@@ -15,7 +15,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useDispatch } from "react-redux";
-import { addFavorite } from "../reducers/favorites";
+import { addFavoriteSync } from "../reducers/favorites";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -275,7 +275,7 @@ export default function AIRecipeScreen({ navigation }) {
       recipe,
     };
 
-    dispatch(addFavorite(favorite));
+    dispatch(addFavoriteSync(favorite) as any);
     Alert.alert("✅ Ajouté aux favoris", "Votre recette IA a été sauvegardée.");
     setModalVisible(false);
   }

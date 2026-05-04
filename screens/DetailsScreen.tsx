@@ -10,7 +10,10 @@ import {
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { LinearGradient } from "expo-linear-gradient";
-import { addFavorite, removeFavorite } from "../reducers/favorites";
+import {
+  addFavoriteSync,
+  removeFavoriteSync,
+} from "../reducers/favorites";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -63,23 +66,24 @@ export default function DetailsScreen({ route }) {
     if (!currentId) return;
 
     if (isFavorite) {
-      dispatch(removeFavorite(currentId));
+      const fav = favorites.find((f) => f.id === currentId);
+      if (fav) dispatch(removeFavoriteSync(fav) as any);
       return;
     }
 
     if (isAI) {
-      dispatch(addFavorite(aiRecipe));
+      dispatch(addFavoriteSync(aiRecipe) as any);
       return;
     }
 
     if (cocktail) {
       dispatch(
-        addFavorite({
+        addFavoriteSync({
           id: cocktailId,
           nom: cocktail.nom,
           image: cocktail.image,
           type: cocktail.type,
-        }),
+        }) as any,
       );
     }
   };

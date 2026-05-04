@@ -2,7 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Text, Platform, View } from "react-native";
-import { Provider } from "react-redux";
+import { Provider, useSelector } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -15,6 +15,8 @@ import DetailsScreen from "./screens/DetailsScreen";
 import FavoritesScreen from "./screens/FavoritesScreen";
 import SurpriseScreen from "./screens/SurpriseScreen";
 import AIRecipeScreen from "./screens/AIRecipeScreen";
+import AuthScreen from "./screens/AuthScreen";
+import ProfileScreen from "./screens/ProfileScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -94,7 +96,68 @@ function MainTabs() {
           ),
         }}
       />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: "Profil",
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22 }}>{focused ? "👤" : "🧑"}</Text>
+          ),
+        }}
+      />
     </Tab.Navigator>
+  );
+}
+
+function RootNavigator() {
+  const token = useSelector((state) => state.user?.value?.token);
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: "#2a0b2e" },
+        headerTintColor: "#ff8a00",
+        headerTitleStyle: { fontWeight: "600", fontSize: 17 },
+        headerBackTitle: "",
+        headerShadowVisible: false,
+        animation: "default",
+      }}
+    >
+      {!token ? (
+        <Stack.Screen
+          name="Auth"
+          component={AuthScreen}
+          options={{ headerShown: false }}
+        />
+      ) : (
+        <>
+          <Stack.Screen
+            name="MainTabs"
+            component={MainTabs}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Details"
+            component={DetailsScreen}
+            options={{
+              title: "Détails du cocktail",
+              headerBackTitle: " ",
+              headerBackTitleVisible: false,
+            }}
+          />
+          <Stack.Screen
+            name="SearchByName"
+            component={SearchByNameScreen}
+            options={{
+              title: "Recherche par nom",
+              headerBackTitle: " ",
+              headerBackTitleVisible: false,
+            }}
+          />
+        </>
+      )}
+    </Stack.Navigator>
   );
 }
 
@@ -104,45 +167,7 @@ export default function App() {
       <PersistGate loading={null} persistor={persistor}>
         <SafeAreaProvider>
           <NavigationContainer>
-            <Stack.Navigator
-              screenOptions={{
-                headerStyle: {
-                  backgroundColor: "#2a0b2e",
-                },
-                headerTintColor: "#ff8a00",
-                headerTitleStyle: {
-                  fontWeight: "600",
-                  fontSize: 17,
-                },
-                headerBackTitle: "",
-                headerShadowVisible: false,
-                animation: "default",
-              }}
-            >
-              <Stack.Screen
-                name="MainTabs"
-                component={MainTabs}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Details"
-                component={DetailsScreen}
-                options={{
-                  title: "Détails du cocktail",
-                  headerBackTitle: " ",
-                  headerBackTitleVisible: false,
-                }}
-              />
-              <Stack.Screen
-                name="SearchByName"
-                component={SearchByNameScreen}
-                options={{
-                  title: "Recherche par nom",
-                  headerBackTitle: " ",
-                  headerBackTitleVisible: false,
-                }}
-              />
-            </Stack.Navigator>
+            <RootNavigator />
           </NavigationContainer>
         </SafeAreaProvider>
       </PersistGate>

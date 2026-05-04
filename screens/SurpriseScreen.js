@@ -13,7 +13,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useDispatch } from "react-redux";
-import { addFavorite } from "../reducers/favorites";
+import { addFavoriteSync } from "../reducers/favorites";
 // backend render :
 const API_URL = "https://cocktail-maker-backend.onrender.com";
 // 5G local
@@ -287,7 +287,7 @@ export default function SurpriseScreen({ navigation }) {
       const activeCocktail = cocktailsRef.current[currentIndexRef.current];
       if (activeCocktail) {
         dispatch(
-          addFavorite({
+          addFavoriteSync({
             id: activeCocktail.id,
             nom: activeCocktail.nom,
             image: activeCocktail.image,

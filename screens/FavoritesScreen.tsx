@@ -11,7 +11,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useSelector, useDispatch } from "react-redux";
 import { LinearGradient } from "expo-linear-gradient";
-import { removeFavorite } from "../reducers/favorites";
+import { removeFavoriteSync } from "../reducers/favorites";
 
 export default function FavoritesScreen({ navigation }) {
   const favorites = useSelector((state: any) => state.favorites.value);
@@ -62,7 +62,8 @@ export default function FavoritesScreen({ navigation }) {
   }, [favorites, tab]);
 
   const handleRemoveFavorite = (id) => {
-    dispatch(removeFavorite(id));
+    const fav = favorites.find((f) => f.id === id);
+    if (fav) dispatch(removeFavoriteSync(fav) as any);
   };
 
   const renderFavorite = ({ item }) => (
