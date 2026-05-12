@@ -5,15 +5,15 @@ import {
   View,
   Image,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { LinearGradient } from "expo-linear-gradient";
-import {
-  addFavoriteSync,
-  removeFavoriteSync,
-} from "../reducers/favorites";
+import { Heart } from "lucide-react-native";
+import { addFavoriteSync, removeFavoriteSync } from "../reducers/favorites";
+import { GlassCard, Chip, AppHeader } from "../components/ui";
+import { colors, radius, spacing, typography } from "../theme";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -24,26 +24,22 @@ function safeText(v: any, fallback = "—") {
   return JSON.stringify(v);
 }
 
-export default function DetailsScreen({ route }) {
+export default function DetailsScreen({ route, navigation }) {
   const { cocktailId, aiRecipe } = route.params || {};
-  const [cocktail, setCocktail] = useState(null);
+  const [cocktail, setCocktail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const dispatch = useDispatch();
-  const favorites = useSelector((state) => state.favorites.value);
+  const favorites = useSelector((state: any) => state.favorites.value);
 
   const isAI = aiRecipe?.source === "ai" && !!aiRecipe?.recipe;
   const currentId = aiRecipe?.id || cocktailId;
-  const isFavorite = favorites.some((fav) => fav.id === currentId);
+  const isFavorite = favorites.some((fav: any) => fav.id === currentId);
 
   useEffect(() => {
-    if (isAI) {
-      setLoading(false);
-      return;
-    }
+    if (isAI) { setLoading(false); return; }
     if (cocktailId) fetchCocktailDetails();
     else setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cocktailId, aiRecipe]);
 
   const fetchCocktailDetails = async () => {
@@ -51,10 +47,8 @@ export default function DetailsScreen({ route }) {
       setLoading(true);
       const response = await fetch(`${API_URL}/cocktail/${cocktailId}`);
       const data = await response.json();
-      if (data.ok) setCocktail(data.cocktail);
-      else setCocktail(null);
-    } catch (error) {
-      console.error("Erreur:", error);
+      setCocktail(data.ok ? data.cocktail : null);
+    } catch {
       alert("Erreur de connexion au serveur");
       setCocktail(null);
     } finally {
@@ -64,495 +58,332 @@ export default function DetailsScreen({ route }) {
 
   const toggleFavorite = () => {
     if (!currentId) return;
-
     if (isFavorite) {
-      const fav = favorites.find((f) => f.id === currentId);
+      const fav = favorites.find((f: any) => f.id === currentId);
       if (fav) dispatch(removeFavoriteSync(fav) as any);
       return;
     }
-
-    if (isAI) {
-      dispatch(addFavoriteSync(aiRecipe) as any);
-      return;
-    }
-
+    if (isAI) { dispatch(addFavoriteSync(aiRecipe) as any); return; }
     if (cocktail) {
-      dispatch(
-        addFavoriteSync({
-          id: cocktailId,
-          nom: cocktail.nom,
-          image: cocktail.image,
-          type: cocktail.type,
-        }) as any,
-      );
+      dispatch(addFavoriteSync({
+        id: cocktailId,
+        nom: cocktail.nom,
+        image: cocktail.image,
+        type: cocktail.type,
+      }) as any);
     }
   };
 
-  // ───────────────────────── UI helpers ─────────────────────────
   const headerBadges = useMemo(() => {
-    if (isAI) return [];
-    if (!cocktail) return [];
-    const arr = [];
-    if (cocktail.type) arr.push({ label: cocktail.type, tone: "pink" });
-    if (cocktail.categorie)
-      arr.push({ label: cocktail.categorie, tone: "amber" });
+    if (isAI || !cocktail) return [];
+    const arr: any[] = [];
+    if (cocktail.type) arr.push({ label: cocktail.type, variant: "solid" });
+    if (cocktail.categorie) arr.push({ label: cocktail.categorie, variant: "outline" });
     return arr;
   }, [cocktail, isAI]);
 
-  // ───────────────────────── LOADING / EMPTY ─────────────────────────
+  // ── Loading ──
   if (loading) {
     return (
-      <LinearGradient
-        colors={["#0d0014", "#2a0025", "#1a0020"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[s.container, s.centered]}
-      >
-        <View style={s.loaderCard}>
-          <ActivityIndicator size="large" color="#ff4fd8" />
-          <Text style={s.loaderText}>Chargement de la recette…</Text>
-        </View>
-      </LinearGradient>
+      <View style={[s.root, s.centered]}>
+        <GlassCard style={s.stateCard}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[typography.bodySm, s.stateText]}>
+            Chargement de la recette…
+          </Text>
+        </GlassCard>
+      </View>
     );
   }
 
+  // ── Not found ──
   if (!isAI && !cocktail) {
     return (
-      <LinearGradient
-        colors={["#0d0014", "#2a0025", "#1a0020"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[s.container, s.centered]}
-      >
-        <View style={s.emptyCard}>
-          <Text style={s.emptyTitle}>Introuvable</Text>
-          <Text style={s.emptyText}>Cocktail non trouvé.</Text>
-        </View>
-      </LinearGradient>
+      <View style={[s.root, s.centered]}>
+        <GlassCard style={s.stateCard}>
+          <Text style={[typography.headlineSm, { color: colors.onSurface }]}>
+            Introuvable
+          </Text>
+          <Text style={[typography.bodySm, s.stateText]}>
+            Cocktail non trouvé.
+          </Text>
+        </GlassCard>
+      </View>
     );
   }
 
-  // ───────────────────────── AI DETAILS ─────────────────────────
+  // ── AI recipe ──
   if (isAI) {
     const r = aiRecipe.recipe;
-
     return (
-      <LinearGradient
-        colors={["#0d0014", "#2a0025", "#1a0020"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.container}
-      >
+      <View style={s.root}>
+        <AppHeader
+          showHomeButton
+          onHomePress={() => navigation.goBack()}
+          onAvatarPress={() => navigation.navigate("Profile")}
+        />
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.scrollContent}
+          contentContainerStyle={s.scrollPad}
         >
-          {/* Hero card */}
-          <View style={s.heroCard}>
+          {/* Hero */}
+          <GlassCard style={s.heroCard}>
             <LinearGradient
-              colors={["rgba(255,79,216,0.22)", "rgba(255,138,0,0.10)"]}
+              colors={[colors.glowPrimary, "transparent"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={s.heroGlow}
             />
             <View style={s.heroTopRow}>
               <View style={s.badgeRow}>
-                <View style={[s.badge, s.badgePink]}>
-                  <Text style={s.badgeText}>RECETTE IA</Text>
-                </View>
-                <View style={[s.badge, s.badgeAmber]}>
-                  <Text style={[s.badgeText, { color: "#ff8a00" }]}>
-                    {safeText(r?.format, "—").toUpperCase()}
-                  </Text>
-                </View>
+                <Chip label="RECETTE IA" variant="solid" active />
+                {r?.format ? (
+                  <Chip
+                    label={safeText(r.format).toUpperCase()}
+                    variant="outline"
+                    uppercase
+                  />
+                ) : null}
               </View>
-
-              <TouchableOpacity
+              <Pressable
                 style={[s.favBtn, isFavorite && s.favBtnActive]}
                 onPress={toggleFavorite}
-                activeOpacity={0.9}
+                hitSlop={8}
               >
-                <Text style={s.favIcon}>{isFavorite ? "♥" : "♡"}</Text>
-              </TouchableOpacity>
+                <Heart
+                  size={20}
+                  color={isFavorite ? colors.tertiaryContainer : colors.onSurfaceVariant}
+                  fill={isFavorite ? colors.tertiaryContainer : "transparent"}
+                  strokeWidth={2}
+                />
+              </Pressable>
             </View>
-
-            <Text style={s.title}>{safeText(r?.name, "Cocktail IA")}</Text>
-
-            <Text style={s.subline} numberOfLines={2}>
-              {safeText(r?.type, "—")} • {safeText(r?.glass, "—")}
+            <Text style={[typography.headlineMd, s.heroTitle]}>
+              {safeText(r?.name, "Cocktail IA")}
             </Text>
-          </View>
+            <Text style={[typography.bodySm, s.heroSub]} numberOfLines={2}>
+              {safeText(r?.type, "—")} · {safeText(r?.glass, "—")}
+            </Text>
+          </GlassCard>
 
-          {/* Sections */}
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>Ingrédients</Text>
-
+          <SectionCard title="Ingrédients">
             {Array.isArray(r?.ingredients) &&
               r.ingredients.map((it: any, idx: number) => (
-                <View key={idx} style={s.rowLine}>
-                  <View style={s.dot} />
-                  <Text style={s.rowLeft} numberOfLines={1}>
-                    {safeText(it?.name)}
-                  </Text>
-                  <Text style={s.rowRight} numberOfLines={1}>
-                    {safeText(it?.amount)}
-                  </Text>
-                </View>
+                <IngredientRow
+                  key={idx}
+                  name={safeText(it?.name)}
+                  amount={safeText(it?.amount)}
+                  last={idx === r.ingredients.length - 1}
+                />
               ))}
-          </View>
+          </SectionCard>
 
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>Préparation</Text>
-
+          <SectionCard title="Préparation">
             {Array.isArray(r?.steps) &&
               r.steps.map((step: any, i: number) => (
-                <View key={i} style={s.stepRow}>
-                  <LinearGradient
-                    colors={["#ff2a6d", "#ff8a00"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={s.stepNum}
-                  >
-                    <Text style={s.stepNumText}>{i + 1}</Text>
-                  </LinearGradient>
-                  <Text style={s.stepText}>{safeText(step)}</Text>
-                </View>
+                <StepRow key={i} index={i + 1} text={safeText(step)} />
               ))}
-          </View>
+          </SectionCard>
 
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>Décoration</Text>
-            <Text style={s.bodyText}>{safeText(r?.garnish)}</Text>
-          </View>
+          <SectionCard title="Décoration">
+            <Text style={[typography.bodySm, s.bodyText]}>
+              {safeText(r?.garnish)}
+            </Text>
+          </SectionCard>
 
           {Array.isArray(r?.tips) && r.tips.length > 0 && (
-            <View style={s.sectionCard}>
-              <Text style={s.sectionTitle}>Conseils du barman</Text>
+            <SectionCard title="Conseils du barman">
               {r.tips.map((t: any, i: number) => (
                 <View key={i} style={s.tipRow}>
                   <Text style={s.tipBullet}>✦</Text>
-                  <Text style={s.bodyText}>{safeText(t)}</Text>
+                  <Text style={[typography.bodySm, s.bodyText]}>{safeText(t)}</Text>
                 </View>
               ))}
-            </View>
+            </SectionCard>
           )}
 
-          <View style={{ height: 26 }} />
+          <View style={{ height: 110 }} />
         </ScrollView>
-      </LinearGradient>
+      </View>
     );
   }
 
-  // ───────────────────────── API DETAILS ─────────────────────────
+  // ── API cocktail ──
   return (
-    <LinearGradient
-      colors={["#0d0014", "#2a0025", "#1a0020"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.container}
-    >
+    <View style={s.root}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Hero image with overlay */}
+        {/* Hero image */}
         <View style={s.imageWrap}>
           <Image source={{ uri: cocktail.image }} style={s.image} />
           <LinearGradient
-            colors={["rgba(0,0,0,0.05)", "rgba(13,0,20,0.92)"]}
-            start={{ x: 0, y: 0 }}
+            colors={["rgba(0,0,0,0)", "rgba(22,17,27,0.96)"]}
+            start={{ x: 0, y: 0.25 }}
             end={{ x: 0, y: 1 }}
-            style={s.imageOverlay}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
+          {/* Back button */}
+          <Pressable
+            style={({ pressed }) => [s.backBtn, { opacity: pressed ? 0.7 : 1 }]}
+            onPress={() => navigation.goBack()}
+            hitSlop={10}
+          >
+            <AppHeader
+              showHomeButton
+              onHomePress={() => navigation.goBack()}
+              onAvatarPress={() => navigation.navigate("Profile")}
+            />
+          </Pressable>
+
           <View style={s.imageTopRow}>
             <View style={s.badgeRow}>
               {headerBadges.map((b, i) => (
-                <View
+                <Chip
                   key={`${b.label}-${i}`}
-                  style={[
-                    s.badge,
-                    b.tone === "amber" ? s.badgeAmber : s.badgePink,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      s.badgeText,
-                      b.tone === "amber" ? { color: "#ff8a00" } : null,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {safeText(b.label, "—").toUpperCase()}
-                  </Text>
-                </View>
+                  label={b.label.toUpperCase()}
+                  variant={b.variant}
+                  uppercase
+                />
               ))}
             </View>
-
-            <TouchableOpacity
+            <Pressable
               style={[s.favBtn, isFavorite && s.favBtnActive]}
               onPress={toggleFavorite}
-              activeOpacity={0.9}
+              hitSlop={8}
             >
-              <Text style={s.favIcon}>{isFavorite ? "♥" : "♡"}</Text>
-            </TouchableOpacity>
+              <Heart
+                size={20}
+                color={isFavorite ? colors.tertiaryContainer : "#fff"}
+                fill={isFavorite ? colors.tertiaryContainer : "transparent"}
+                strokeWidth={2}
+              />
+            </Pressable>
           </View>
 
           <View style={s.imageTitleBlock}>
-            <Text style={s.title} numberOfLines={2}>
+            <Text style={[typography.displayMd, s.imageTitle]} numberOfLines={2}>
               {safeText(cocktail.nom, "Cocktail")}
             </Text>
-            <Text style={s.subline} numberOfLines={1}>
-              {safeText(cocktail.type)} • {safeText(cocktail.categorie)}
+            <Text style={[typography.bodySm, s.imageSubline]} numberOfLines={1}>
+              {safeText(cocktail.type)} · {safeText(cocktail.categorie)}
             </Text>
           </View>
         </View>
 
         <View style={s.pagePad}>
-          {/* Glass */}
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>Verre</Text>
-            <Text style={s.bodyText}>{safeText(cocktail.verre)}</Text>
-          </View>
+          <SectionCard title="Verre">
+            <Text style={[typography.bodySm, s.bodyText]}>
+              {safeText(cocktail.verre)}
+            </Text>
+          </SectionCard>
 
-          {/* Ingredients */}
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>Ingrédients</Text>
+          <SectionCard title="Ingrédients">
             {Array.isArray(cocktail.ingredients) &&
-              cocktail.ingredients.map((ing, index) => (
-                <View key={index} style={s.rowLine}>
-                  <View style={s.dot} />
-                  <Text style={s.rowLeft} numberOfLines={1}>
-                    {safeText(ing?.nom)}
-                  </Text>
-                  <Text style={s.rowRight} numberOfLines={1}>
-                    {safeText(ing?.quantite)}
-                  </Text>
-                </View>
+              cocktail.ingredients.map((ing: any, index: number) => (
+                <IngredientRow
+                  key={index}
+                  name={safeText(ing?.nom)}
+                  amount={safeText(ing?.quantite)}
+                  last={index === cocktail.ingredients.length - 1}
+                />
               ))}
-          </View>
+          </SectionCard>
 
-          {/* Preparation */}
-          <View style={s.sectionCard}>
-            <Text style={s.sectionTitle}>Préparation</Text>
-            <Text style={s.bodyText}>{safeText(cocktail.instructions)}</Text>
-          </View>
+          <SectionCard title="Préparation">
+            <Text style={[typography.bodySm, s.bodyText]}>
+              {safeText(cocktail.instructions)}
+            </Text>
+          </SectionCard>
 
-          {/* Tags */}
           {Array.isArray(cocktail.tags) && cocktail.tags.length > 0 && (
-            <View style={s.sectionCard}>
-              <Text style={s.sectionTitle}>Tags</Text>
+            <SectionCard title="Tags">
               <View style={s.tagWrap}>
-                {cocktail.tags.map((tag, index) => (
-                  <View key={index} style={s.tagPill}>
-                    <Text style={s.tagText}>{safeText(tag)}</Text>
-                  </View>
+                {cocktail.tags.map((tag: any, index: number) => (
+                  <Chip key={index} label={safeText(tag)} variant="solid" />
                 ))}
               </View>
-            </View>
+            </SectionCard>
           )}
 
-          <View style={{ height: 26 }} />
+          <View style={{ height: 110 }} />
         </View>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
-// ───────────────────────── Styles (DA “Mixologue” premium) ─────────────────────────
-const s = StyleSheet.create({
-  container: { flex: 1 },
+// ── Sub-components ──
 
-  centered: { justifyContent: "center", alignItems: "center" },
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <GlassCard style={sc.card}>
+      <Text style={[typography.labelLg, sc.title]}>{title}</Text>
+      {children}
+    </GlassCard>
+  );
+}
 
-  scrollContent: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 18,
-  },
+function IngredientRow({ name, amount, last }: { name: string; amount: string; last: boolean }) {
+  return (
+    <View style={[sc.row, !last && sc.rowBorder]}>
+      <View style={sc.dot} />
+      <Text style={[typography.bodySm, sc.rowName]} numberOfLines={1}>{name}</Text>
+      <Text style={[typography.labelMd, sc.rowAmount]} numberOfLines={1}>{amount}</Text>
+    </View>
+  );
+}
 
-  // Loading / Empty
-  loaderCard: {
-    width: "86%",
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.35)",
-    paddingVertical: 22,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    gap: 10,
-  },
-  loaderText: {
-    color: "rgba(255,216,244,0.75)",
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
-  emptyCard: {
-    width: "86%",
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.35)",
-    paddingVertical: 22,
-    paddingHorizontal: 16,
-    alignItems: "center",
-  },
-  emptyTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "900",
-    marginBottom: 6,
-  },
-  emptyText: { color: "rgba(255,216,244,0.75)", fontWeight: "700" },
+function StepRow({ index, text }: { index: number; text: string }) {
+  return (
+    <View style={sc.stepRow}>
+      <LinearGradient
+        colors={[colors.gradientStart, colors.gradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={sc.stepNum}
+      >
+        <Text style={sc.stepNumText}>{index}</Text>
+      </LinearGradient>
+      <Text style={[typography.bodySm, sc.stepText]}>{text}</Text>
+    </View>
+  );
+}
 
-  // Hero (AI)
-  heroCard: {
-    backgroundColor: "rgba(21,0,31,0.70)",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.35)",
-    padding: 16,
-    overflow: "hidden",
-    marginBottom: 14,
+const sc = StyleSheet.create({
+  card: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
   },
-  heroGlow: {
-    position: "absolute",
-    left: -40,
-    top: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 999,
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-    gap: 10,
-  },
-
-  // Hero image (API)
-  imageWrap: { height: 340, backgroundColor: "#12001a" },
-  image: { width: "100%", height: "100%" },
-  imageOverlay: { ...StyleSheet.absoluteFillObject },
-  imageTopRow: {
-    position: "absolute",
-    top: 20,
-    left: 16,
-    right: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  imageTitleBlock: {
-    position: "absolute",
-    bottom: 18,
-    left: 16,
-    right: 16,
-  },
-  pagePad: { paddingHorizontal: 20, paddingTop: 16 },
-
-  // Badges
-  badgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", flex: 1 },
-  badge: {
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    maxWidth: 220,
-  },
-  badgePink: {
-    backgroundColor: "rgba(255,42,109,0.22)",
-    borderColor: "rgba(255,42,109,0.6)",
-  },
-  badgeAmber: {
-    backgroundColor: "rgba(255,138,0,0.14)",
-    borderColor: "rgba(255,138,0,0.55)",
-  },
-  badgeText: {
-    color: "#ff4fd8",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.0,
-  },
-
-  // Fav button
-  favBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(21,0,31,0.55)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  favBtnActive: {
-    backgroundColor: "rgba(154, 11, 56, 0.26)",
-    borderColor: "rgba(255,42,109,0.9)",
-  },
-  favIcon: { color: "#fff", fontSize: 18, fontWeight: "900" },
-
-  // Titles
   title: {
-    color: "#fff",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -0.4,
-    lineHeight: 32,
-  },
-  subline: {
-    color: "rgba(255,216,244,0.65)",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 6,
-    letterSpacing: 0.3,
-  },
-
-  // Cards (sections)
-  sectionCard: {
-    backgroundColor: "rgba(21,0,31,0.60)",
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.28)",
-    padding: 16,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 14,
-    letterSpacing: 0.5,
-    marginBottom: 10,
+    color: colors.primary,
     textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
   },
-  bodyText: {
-    color: "rgba(255,216,244,0.78)",
-    fontSize: 13,
-    lineHeight: 21,
-    fontWeight: "600",
-  },
-
-  // Rows like “ingredient name / qty”
-  rowLine: {
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,79,216,0.10)",
+    paddingVertical: 10,
+    gap: spacing.sm,
+  },
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#ff2a6d",
-    marginRight: 10,
+    backgroundColor: colors.primary,
+    flexShrink: 0,
   },
-  rowLeft: { flex: 1, color: "#ffd8f4", fontWeight: "700", fontSize: 13 },
-  rowRight: { color: "#ff8a00", fontWeight: "900", fontSize: 12 },
-
-  // Steps
+  rowName: { flex: 1, color: colors.onSurface },
+  rowAmount: { color: colors.primaryContainer },
   stepRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.sm,
     alignItems: "flex-start",
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   stepNum: {
     width: 24,
@@ -564,21 +395,99 @@ const s = StyleSheet.create({
     marginTop: 1,
   },
   stepNumText: { color: "#fff", fontSize: 11, fontWeight: "900" },
-  stepText: { flex: 1, color: "#ffd8f4", fontSize: 13, lineHeight: 21 },
+  stepText: { flex: 1, color: colors.onSurface, lineHeight: 22 },
+});
 
-  // Tips
-  tipRow: { flexDirection: "row", gap: 8, marginBottom: 6 },
-  tipBullet: { color: "#ff4fd8", marginTop: 3, fontSize: 10 },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  centered: { justifyContent: "center", alignItems: "center" },
+  scrollPad: { paddingHorizontal: spacing.containerMargin, paddingBottom: 18 },
 
-  // Tags
-  tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tagPill: {
-    backgroundColor: "rgba(255,79,216,0.10)",
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,79,216,0.45)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  stateCard: {
+    width: "85%",
+    padding: spacing.xl,
+    alignItems: "center",
+    gap: spacing.sm,
   },
-  tagText: { color: "#fff", fontWeight: "800", fontSize: 12 },
+  stateText: { color: colors.onSurfaceVariant },
+
+  // AI hero
+  heroCard: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    overflow: "hidden",
+  },
+  heroGlow: {
+    position: "absolute",
+    left: -40,
+    top: -40,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  heroTitle: { color: colors.onSurface, marginBottom: 4 },
+  heroSub: { color: colors.onSurfaceVariant },
+
+  // API hero image
+  imageWrap: { height: 340, backgroundColor: colors.surfaceContainerLow },
+  image: { width: "100%", height: "100%" },
+  backBtn: { position: "absolute", top: 0, left: 0, right: 0 },
+  imageTopRow: {
+    position: "absolute",
+    top: 20,
+    left: spacing.containerMargin,
+    right: spacing.containerMargin,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  imageTitleBlock: {
+    position: "absolute",
+    bottom: spacing.md,
+    left: spacing.containerMargin,
+    right: spacing.containerMargin,
+  },
+  imageTitle: {
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  imageSubline: { color: "rgba(255,255,255,0.7)", marginTop: 6 },
+
+  pagePad: {
+    paddingHorizontal: spacing.containerMargin,
+    paddingTop: spacing.md,
+  },
+
+  badgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", flex: 1 },
+
+  favBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glassFill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  favBtnActive: {
+    backgroundColor: "rgba(255, 79, 114, 0.2)",
+    borderColor: colors.tertiaryContainer,
+  },
+
+  bodyText: { color: colors.onSurfaceVariant, lineHeight: 22 },
+
+  tipRow: { flexDirection: "row", gap: spacing.sm, marginBottom: 6 },
+  tipBullet: { color: colors.primary, marginTop: 3, fontSize: 10 },
+
+  tagWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 });

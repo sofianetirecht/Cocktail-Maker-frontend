@@ -1,20 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   StyleSheet,
-  View,
-  ScrollView,
   Text,
+  View,
   TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
+  Pressable,
   FlatList,
   Image,
-  Keyboard,
+  ActivityIndicator,
+  ScrollView,
   KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "@react-navigation/native";
+import { AppHeader, GlassCard } from "../components/ui";
+import { colors, radius, spacing, typography } from "../theme";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -25,7 +26,6 @@ export default function SearchByNameScreen({ navigation }) {
   const [searched, setSearched] = useState(false);
   const debounceRef = useRef(null);
 
-  // Vider le champ quand on quitte la page
   useFocusEffect(
     React.useCallback(() => {
       return () => {
@@ -36,64 +36,28 @@ export default function SearchByNameScreen({ navigation }) {
     }, []),
   );
 
-  useEffect(() => {
-    // Annuler le timeout précédent
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    // Si le champ est vide, vider les résultats
+  React.useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!cocktailName.trim()) {
       setResults([]);
       setSearched(false);
       return;
     }
-
-    // Attendre 400ms après la dernière frappe
-    debounceRef.current = setTimeout(() => {
-      handleSearch();
-    }, 100);
-
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
+    debounceRef.current = setTimeout(() => handleSearch(), 100);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [cocktailName]);
-
-  // Vider le champ quand on quitte la page
-  useFocusEffect(
-    React.useCallback(() => {
-      return () => {
-        setCocktailName("");
-        setResults([]);
-        setSearched(false);
-      };
-    }, []),
-  );
-
-  const canSearch = cocktailName.trim().length > 0 && !loading;
 
   const handleSearch = async () => {
     if (!cocktailName.trim()) return;
-
     setLoading(true);
-
     try {
       const response = await fetch(
         `${API_URL}/cocktail/searchByName?name=${encodeURIComponent(cocktailName)}`,
       );
       const data = await response.json();
-
-      if (data.drinks && Array.isArray(data.drinks)) {
-        setResults(data.drinks);
-        setSearched(true);
-      } else {
-        setResults([]);
-        setSearched(true);
-      }
-    } catch (error) {
-      console.error("Erreur recherche nom:", error);
+      setResults(data.drinks && Array.isArray(data.drinks) ? data.drinks : []);
+      setSearched(true);
+    } catch {
       setResults([]);
       setSearched(true);
     } finally {
@@ -101,276 +65,194 @@ export default function SearchByNameScreen({ navigation }) {
     }
   };
 
-  const renderCocktail = ({ item }) => {
-    return (
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-        <TouchableOpacity
-          style={s.card}
-          activeOpacity={0.92}
-          onPress={() =>
-            navigation.navigate("Details", { cocktailId: item.idDrink })
-          }
-        >
-          <View style={s.cardMedia}>
-            <Image source={{ uri: item.strDrinkThumb }} style={s.cardImage} />
-            <LinearGradient
-              colors={["rgba(0,0,0,0.08)", "rgba(13,0,20,0.88)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={s.cardOverlay}
-            />
-
-            <View style={s.cardTitleBlock}>
-              <Text style={s.cardTitle} numberOfLines={2}>
-                {item.strDrink || "Cocktail"}
-              </Text>
-              <Text style={s.cardSub} numberOfLines={1}>
-                Clique pour voir la recette
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </KeyboardAvoidingView>
-    );
-  };
+  const renderCocktail = ({ item }) => (
+    <Pressable
+      style={({ pressed }) => [s.card, { opacity: pressed ? 0.88 : 1 }]}
+      onPress={() => navigation.navigate("Details", { cocktailId: item.idDrink })}
+    >
+      <Image source={{ uri: item.strDrinkThumb }} style={s.cardImage} />
+      <LinearGradient
+        colors={["rgba(0,0,0,0)", "rgba(22,17,27,0.95)"]}
+        start={{ x: 0, y: 0.3 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      <View style={s.cardFooter}>
+        <Text style={[typography.titleMd, s.cardName]} numberOfLines={2}>
+          {item.strDrink || "Cocktail"}
+        </Text>
+        <Text style={[typography.labelSm, s.cardSub]}>
+          Appuie pour voir la recette
+        </Text>
+      </View>
+    </Pressable>
+  );
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <LinearGradient
-        colors={["#0d0014", "#2a0025", "#1a0020"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.container}
-      >
-        <StatusBar style="light" />
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View style={s.header}>
-            <Text style={s.title}>Recherche par nom</Text>
-            <Text style={s.subtitle}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={s.root}>
+        <AppHeader
+          showHomeButton
+          onHomePress={() => navigation.goBack()}
+          onAvatarPress={() => navigation.navigate("Profile")}
+        />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={s.pageHeader}>
+            <Text style={[typography.headlineMd, s.pageTitle]}>
+              Recherche par nom
+            </Text>
+            <Text style={[typography.bodySm, s.pageSub]}>
               Entre le nom du cocktail que tu recherches.
             </Text>
           </View>
 
-          {/* Search box */}
-          <View style={s.searchCard}>
-            <Text style={s.label}>Nom du cocktail</Text>
-
+          <View style={s.inputCard}>
+            <Text style={[typography.labelMd, s.label]}>Nom du cocktail</Text>
             <TextInput
-              style={s.input}
+              style={[typography.bodySm, s.input]}
               placeholder="Mojito, Margarita, Martini…"
-              placeholderTextColor="rgba(255,216,244,0.35)"
+              placeholderTextColor={colors.onSurfaceVariant}
               value={cocktailName}
               onChangeText={setCocktailName}
               returnKeyType="search"
+              autoFocus
             />
           </View>
 
-          {/* States */}
           {loading && (
-            <View style={s.loaderWrap}>
-              <ActivityIndicator size="large" color="#ff4fd8" />
-              <Text style={s.loaderText}>Recherche en cours…</Text>
+            <View style={s.stateWrap}>
+              <ActivityIndicator color={colors.primary} size="large" />
+              <Text style={[typography.bodySm, s.stateText]}>
+                Recherche en cours…
+              </Text>
             </View>
           )}
 
           {!loading && searched && results.length === 0 && (
-            <View style={s.emptyWrap}>
-              <View style={s.emptyCard}>
-                <Text style={s.emptyIcon}>😕</Text>
-                <Text style={s.emptyTitle}>Aucun résultat</Text>
-                <Text style={s.emptyText}>
-                  Vérifie l'orthographe ou essaie avec un autre nom.
-                </Text>
-              </View>
-            </View>
+            <GlassCard style={s.emptyCard}>
+              <Text style={s.emptyIcon}>😕</Text>
+              <Text style={[typography.headlineSm, s.emptyTitle]}>
+                Aucun résultat
+              </Text>
+              <Text style={[typography.bodySm, s.emptyText]}>
+                Vérifie l'orthographe ou essaie avec un autre nom.
+              </Text>
+            </GlassCard>
           )}
 
           {!loading && results.length > 0 && (
             <View style={s.resultsWrap}>
               <View style={s.resultsHeader}>
-                <Text style={s.resultsTitle}>Résultats</Text>
-                <Text style={s.resultsCount}>
+                <Text style={[typography.labelLg, s.resultsTitle]}>
+                  Résultats
+                </Text>
+                <Text style={[typography.labelMd, { color: colors.onSurfaceVariant }]}>
                   {results.length} cocktail{results.length > 1 ? "s" : ""}
                 </Text>
               </View>
-
               <FlatList
                 data={results}
                 renderItem={renderCocktail}
                 keyExtractor={(item) => String(item.idDrink)}
                 scrollEnabled={false}
-                contentContainerStyle={{ gap: 12, paddingBottom: 26 }}
+                contentContainerStyle={{ gap: spacing.sm }}
               />
             </View>
           )}
 
-          <View style={{ height: 26 }} />
+          <View style={{ height: 110 }} />
         </ScrollView>
-      </LinearGradient>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
+  root: { flex: 1, backgroundColor: colors.background },
+  scroll: { paddingHorizontal: spacing.containerMargin },
 
-  header: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+  pageHeader: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    alignItems: "center",
   },
-  title: {
-    color: "#fff",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    color: "rgba(255,216,244,0.65)",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 6,
-    letterSpacing: 0.3,
-  },
+  pageTitle: { color: colors.onSurface },
+  pageSub: { color: colors.onSurfaceVariant, marginTop: 4, textAlign: "center" },
 
-  searchCard: {
-    marginTop: 8,
-    marginHorizontal: 20,
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    padding: 16,
+  inputCard: {
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.xl,
   },
-
   label: {
-    color: "#ffd8f4",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.2,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.xs,
     textTransform: "uppercase",
-    marginBottom: 10,
+    letterSpacing: 1,
   },
-
   input: {
-    backgroundColor: "rgba(21,0,31,0.55)",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.45)",
-    paddingHorizontal: 14,
+    color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.outlineVariant,
+    paddingHorizontal: spacing.md,
     paddingVertical: 14,
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
   },
 
-  cta: {
-    marginTop: 14,
-    borderRadius: 18,
-    overflow: "hidden",
-  },
-  ctaDisabled: { opacity: 0.45 },
-  ctaGrad: {
-    height: 54,
-    borderRadius: 18,
+  stateWrap: {
     alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
+    paddingTop: spacing.lg,
   },
-  ctaIcon: { color: "#fff", fontSize: 16 },
-  ctaText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 15,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
+  stateText: { color: colors.onSurfaceVariant },
 
-  loaderWrap: {
-    marginTop: 18,
-    alignItems: "center",
-    gap: 10,
-  },
-  loaderText: {
-    color: "rgba(255,216,244,0.65)",
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
-
-  emptyWrap: { paddingHorizontal: 20, paddingTop: 18 },
   emptyCard: {
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    paddingVertical: 24,
-    paddingHorizontal: 18,
+    padding: spacing.xl,
     alignItems: "center",
+    marginTop: spacing.sm,
   },
-  emptyIcon: { fontSize: 54, marginBottom: 10 },
-  emptyTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
-  emptyText: {
-    marginTop: 6,
-    color: "rgba(255,216,244,0.75)",
-    textAlign: "center",
-    lineHeight: 20,
-    fontWeight: "700",
-    fontSize: 13,
-  },
+  emptyIcon: { fontSize: 48, marginBottom: spacing.sm },
+  emptyTitle: { color: colors.onSurface, marginBottom: spacing.xs },
+  emptyText: { color: colors.onSurfaceVariant, textAlign: "center" },
 
-  resultsWrap: { paddingTop: 18, paddingHorizontal: 20 },
+  resultsWrap: { paddingTop: spacing.sm },
   resultsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: 12,
+    alignItems: "center",
+    marginBottom: spacing.sm,
   },
   resultsTitle: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 0.8,
+    color: colors.onSurface,
     textTransform: "uppercase",
-  },
-  resultsCount: {
-    color: "rgba(255,216,244,0.65)",
-    fontSize: 12,
-    fontWeight: "800",
+    letterSpacing: 1,
   },
 
-  // Card
   card: {
-    borderRadius: 22,
+    height: 190,
+    borderRadius: radius.xl,
     overflow: "hidden",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    backgroundColor: "rgba(21,0,31,0.60)",
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
   },
-  cardMedia: { height: 190, backgroundColor: "#12001a" },
   cardImage: { width: "100%", height: "100%" },
-  cardOverlay: { ...StyleSheet.absoluteFillObject },
-
-  cardTitleBlock: {
+  cardFooter: {
     position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 12,
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
   },
-  cardTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-    lineHeight: 22,
-  },
-  cardSub: {
-    marginTop: 6,
-    color: "rgba(255,216,244,0.75)",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 18,
-  },
+  cardName: { color: "#fff", marginBottom: 4 },
+  cardSub: { color: "rgba(255,255,255,0.6)" },
 });

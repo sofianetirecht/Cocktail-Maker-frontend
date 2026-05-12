@@ -1,35 +1,31 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import {
   StyleSheet,
   Text,
   View,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   Image,
-  Animated,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
-import { useSelector, useDispatch } from "react-redux";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSelector, useDispatch } from "react-redux";
+import { Trash2 } from "lucide-react-native";
 import { removeFavoriteSync } from "../reducers/favorites";
+import {
+  AppHeader,
+  GlassCard,
+  Chip,
+  SegmentedToggle,
+} from "../components/ui";
+import { colors, radius, spacing, typography } from "../theme";
+
+type TabValue = "all" | "alcohol" | "noalcohol";
 
 export default function FavoritesScreen({ navigation }) {
   const favorites = useSelector((state: any) => state.favorites.value);
   const dispatch = useDispatch();
 
-  const [tab, setTab] = useState<"all" | "alcohol" | "noalcohol">("all");
-  const [toggleWidth, setToggleWidth] = useState(0);
-  const toggleSlide = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const targetValue = tab === "all" ? 0 : tab === "alcohol" ? 1 : 2;
-    Animated.spring(toggleSlide, {
-      toValue: targetValue,
-      friction: 8,
-      tension: 100,
-      useNativeDriver: false,
-    }).start();
-  }, [tab]);
+  const [tab, setTab] = useState<TabValue>("all");
 
   const filtered = useMemo(() => {
     let result = [];
@@ -53,7 +49,6 @@ export default function FavoritesScreen({ navigation }) {
       });
     else result = [...favorites];
 
-    // Trier : recettes IA en premier
     return result.sort((a, b) => {
       const aIsAI = a.source === "ai" ? 0 : 1;
       const bIsAI = b.source === "ai" ? 0 : 1;
@@ -61,15 +56,13 @@ export default function FavoritesScreen({ navigation }) {
     });
   }, [favorites, tab]);
 
-  const handleRemoveFavorite = (id) => {
+  const handleRemove = (id: any) => {
     const fav = favorites.find((f) => f.id === id);
     if (fav) dispatch(removeFavoriteSync(fav) as any);
   };
 
-  const renderFavorite = ({ item }) => (
-    <TouchableOpacity
-      style={s.card}
-      activeOpacity={0.92}
+  const renderItem = ({ item }) => (
+    <Pressable
       onPress={() => {
         if (item.source === "ai") {
           navigation.navigate("Details", { aiRecipe: item });
@@ -77,344 +70,250 @@ export default function FavoritesScreen({ navigation }) {
           navigation.navigate("Details", { cocktailId: item.id });
         }
       }}
+      style={({ pressed }) => [
+        s.card,
+        { opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] },
+      ]}
     >
+      {/* Thumbnail */}
       <Image source={{ uri: item.image }} style={s.thumb} />
-
-      {/* overlay */}
       <LinearGradient
-        colors={["rgba(0,0,0,0.05)", "rgba(13,0,20,0.78)"]}
+        colors={["rgba(31,26,35,0)", "rgba(31,26,35,0.85)"]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.thumbOverlay}
+        end={{ x: 1, y: 0 }}
+        style={s.thumbFade}
+        pointerEvents="none"
       />
 
-      <View style={s.content}>
-        <View style={s.cardTopRow}>
+      {/* Content */}
+      <View style={s.cardContent}>
+        <View style={s.cardTop}>
           <View style={s.badgeRow}>
             {item.source === "ai" && (
-              <View style={[s.badge, s.badgeAI]}>
-                <Text style={s.badgeAIText}>IA</Text>
+              <View style={s.badgeAI}>
+                <Text style={[typography.labelSm, s.badgeAIText]}>IA</Text>
               </View>
             )}
-            <View style={[s.badge, s.badgeGhost]}>
-              <Text style={s.badgeGhostText}>
-                {(item.type || "—").toUpperCase()}
-              </Text>
-            </View>
+            {item.type ? (
+              <Chip
+                label={String(item.type).toUpperCase()}
+                variant="outline"
+                uppercase
+              />
+            ) : null}
           </View>
 
-          <TouchableOpacity
-            style={s.trashBtn}
-            onPress={() => handleRemoveFavorite(item.id)}
-            activeOpacity={0.85}
+          <Pressable
+            onPress={() => handleRemove(item.id)}
+            hitSlop={12}
+            style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1 })}
           >
-            <Text style={s.trashIcon}>🗑️</Text>
-          </TouchableOpacity>
+            <Trash2
+              size={18}
+              color={colors.onSurfaceVariant}
+              strokeWidth={1.5}
+            />
+          </Pressable>
         </View>
 
-        <Text style={s.name} numberOfLines={2}>
+        <Text
+          style={[typography.titleMd, s.name]}
+          numberOfLines={1}
+        >
           {item.nom}
         </Text>
-
-        <Text style={s.sub} numberOfLines={1}>
+        <Text style={[typography.labelSm, s.sub]}>
           Appuie pour ouvrir la recette
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 
-  if (favorites.length === 0) {
-    return (
-      <LinearGradient
-        colors={["#0d0014", "#2a0025", "#1a0020"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.emptyWrap}
-      >
-        <View style={s.emptyCard}>
-          <Text style={s.emptyIcon}>💔</Text>
-          <Text style={s.emptyTitle}>Aucun favori</Text>
-          <Text style={s.emptyText}>
-            Ajoute des cocktails à tes favoris pour les retrouver ici.
-          </Text>
-        </View>
-      </LinearGradient>
-    );
-  }
-
   return (
-    <LinearGradient
-      colors={["#0d0014", "#2a0025", "#1a0020"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.container}
-    >
-      <StatusBar style="light" />
+    <View style={s.root}>
+      <AppHeader
+        showHomeButton={false}
+        onAvatarPress={() => navigation.navigate("Profile")}
+      />
 
-      {/* Header */}
-      <View style={s.header}>
-        <Text style={s.title}>Favoris</Text>
-        <Text style={s.count}>
-          {filtered.length} cocktail{filtered.length > 1 ? "s" : ""} •{" "}
-          {favorites.length} au total
+      <View style={s.content}>
+        {/* Count */}
+        <Text style={[typography.labelMd, s.count]}>
+          {filtered.length} cocktail{filtered.length !== 1 ? "s" : ""}
+          {favorites.length !== filtered.length
+            ? ` · ${favorites.length} au total`
+            : ""}
         </Text>
 
-        {/* Tabs */}
-        <View
-          style={s.tabs}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            setToggleWidth(w);
-          }}
-        >
-          {toggleWidth > 0 && (
-            <Animated.View
-              style={[
-                s.slideIndicator,
-                {
-                  width: (toggleWidth - 8 - 12) / 3,
-                  transform: [
-                    {
-                      translateX: toggleSlide.interpolate({
-                        inputRange: [0, 1, 2],
-                        outputRange: [
-                          0,
-                          (toggleWidth - 8 - 12) / 3 + 6,
-                          ((toggleWidth - 8 - 12) / 3 + 6) * 2,
-                        ],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-          )}
-          {[
-            { key: "all", label: "Tout" },
-            { key: "alcohol", label: "Avec alcool" },
-            { key: "noalcohol", label: "Sans alcool" },
-          ].map((t) => (
-            <TouchableOpacity
-              key={t.key}
-              style={s.tab}
-              onPress={() => setTab(t.key as any)}
-              activeOpacity={0.9}
-            >
-              <Text style={[s.tabText, tab === t.key && s.tabTextActive]}>
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+        {/* Filter */}
+        <SegmentedToggle
+          segments={[
+            { value: "all" as TabValue, label: "Tout" },
+            { value: "alcohol" as TabValue, label: "Avec alcool" },
+            { value: "noalcohol" as TabValue, label: "Sans alcool" },
+          ]}
+          value={tab}
+          onChange={(v) => setTab(v)}
+          style={s.toggle}
+        />
 
-      <FlatList
-        data={filtered}
-        renderItem={renderFavorite}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={s.list}
-        showsVerticalScrollIndicator={false}
-      />
-    </LinearGradient>
+        {/* List */}
+        {favorites.length === 0 ? (
+          <View style={s.emptyWrap}>
+            <GlassCard style={s.emptyCard}>
+              <Text style={s.emptyIcon}>💔</Text>
+              <Text style={[typography.headlineSm, s.emptyTitle]}>
+                Aucun favori
+              </Text>
+              <Text style={[typography.bodySm, s.emptyText]}>
+                Ajoute des cocktails à tes favoris pour les retrouver ici.
+              </Text>
+            </GlassCard>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            renderItem={renderItem}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={s.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={s.emptyWrap}>
+                <GlassCard style={s.emptyCard}>
+                  <Text style={s.emptyIcon}>🔍</Text>
+                  <Text style={[typography.headlineSm, s.emptyTitle]}>
+                    Aucun résultat
+                  </Text>
+                  <Text style={[typography.bodySm, s.emptyText]}>
+                    Aucun favori dans cette catégorie.
+                  </Text>
+                </GlassCard>
+              </View>
+            }
+          />
+        )}
+      </View>
+    </View>
   );
 }
 
+const THUMB_SIZE = 96;
+
 const s = StyleSheet.create({
-  container: { flex: 1 },
-
-  header: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    alignItems: "center",
-  },
-  title: {
-    color: "#fff",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -0.3,
-    textAlign: "center",
-  },
-  count: {
-    color: "rgba(255,216,244,0.65)",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 6,
-    letterSpacing: 0.3,
-  },
-
-  // Tabs (pill segmented control)
-  tabs: {
-    marginTop: 14,
-    position: "relative",
-    flexDirection: "row",
-    backgroundColor: "rgba(21,0,31,0.70)",
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.28)",
-    padding: 4,
-    gap: 6,
-  },
-  slideIndicator: {
-    position: "absolute",
-    left: 4,
-    top: 4,
-    bottom: 4,
-    backgroundColor: "rgba(255,42,109,0.9)",
-    borderRadius: 999,
-  },
-  tab: {
+  root: {
     flex: 1,
-    borderRadius: 999,
-    paddingVertical: 10,
-    alignItems: "center",
-    zIndex: 1,
+    backgroundColor: colors.background,
   },
-  tabText: {
-    color: "rgba(255,216,244,0.6)",
-    fontWeight: "900",
-    fontSize: 11,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.containerMargin,
+    paddingTop: spacing.sm,
   },
-  tabTextActive: { color: "#fff" },
+
+  count: {
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.sm,
+  },
+  toggle: {
+    marginBottom: spacing.md,
+  },
 
   list: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 12,
+    gap: spacing.sm,
+    paddingBottom: 110,
   },
 
   // Card
   card: {
-    height: 110,
-    borderRadius: 20,
+    height: THUMB_SIZE,
+    flexDirection: "row",
+    borderRadius: radius.lg,
     overflow: "hidden",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    backgroundColor: "rgba(21,0,31,0.60)",
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
   },
-
-  // Image (full-left background)
   thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+  },
+  thumbFade: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
-    width: 110,
-    backgroundColor: "#12001a",
+    width: THUMB_SIZE + 24,
   },
-  thumbOverlay: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 110,
-  },
-
-  content: {
+  cardContent: {
     flex: 1,
-    padding: 14,
-    paddingLeft: 122,
+    paddingVertical: 10,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.md,
     justifyContent: "center",
+    gap: 4,
   },
-
-  cardTopRow: {
+  cardTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
-    gap: 10,
+    gap: spacing.xs,
   },
-
-  badgeRow: { flexDirection: "row", gap: 6, flex: 1, flexWrap: "wrap" },
-  badge: {
-    borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderWidth: 1,
+  badgeRow: {
+    flexDirection: "row",
+    gap: 6,
+    flex: 1,
+    flexWrap: "nowrap",
+    overflow: "hidden",
   },
   badgeAI: {
-    backgroundColor: "rgba(138,43,226,0.18)",
-    borderColor: "rgba(138,43,226,0.65)",
-  },
-  badgeAIText: {
-    color: "#ba7fff",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.0,
-  },
-  badgeAmber: {
-    backgroundColor: "rgba(255,138,0,0.14)",
-    borderColor: "rgba(255,138,0,0.55)",
-  },
-  badgeGhost: {
-    backgroundColor: "rgba(255,79,216,0.08)",
-    borderColor: "rgba(255,79,216,0.35)",
-  },
-  badgeText: {
-    color: "#ff4fd8",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.0,
-  },
-  badgeGhostText: {
-    color: "rgba(255,216,244,0.80)",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.8,
-  },
-
-  name: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-    lineHeight: 20,
-  },
-  sub: {
-    color: "rgba(255,216,244,0.55)",
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 6,
-  },
-
-  trashBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,79,216,0.10)",
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 3,
     borderWidth: 1,
-    borderColor: "rgba(255,79,216,0.35)",
+    borderColor: colors.primary,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
-  trashIcon: { fontSize: 16 },
+  badgeAIText: {
+    color: colors.primary,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    textAlignVertical: "center",
+    includeFontPadding: false,
+  },
 
-  // Empty state
-  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  name: {
+    color: colors.onSurface,
+  },
+  sub: {
+    color: colors.onSurfaceVariant,
+  },
+
+  // Empty
+  emptyWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 80,
+  },
   emptyCard: {
-    width: "86%",
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.35)",
-    paddingVertical: 26,
-    paddingHorizontal: 18,
+    width: "85%",
+    padding: spacing.xl,
     alignItems: "center",
   },
-  emptyIcon: { fontSize: 64, marginBottom: 10 },
+  emptyIcon: {
+    fontSize: 52,
+    marginBottom: spacing.md,
+  },
   emptyTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "900",
-    marginBottom: 6,
+    color: colors.onSurface,
+    marginBottom: spacing.xs,
+    textAlign: "center",
   },
   emptyText: {
-    color: "rgba(255,216,244,0.75)",
+    color: colors.onSurfaceVariant,
     textAlign: "center",
     lineHeight: 20,
-    fontWeight: "700",
-    fontSize: 13,
   },
 });

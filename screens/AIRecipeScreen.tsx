@@ -1,85 +1,108 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
   Modal,
   Alert,
-  Keyboard,
-  Animated,
+  ImageBackground,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useDispatch } from "react-redux";
+import {
+  Sparkles,
+  X,
+  Plus,
+  Heart,
+  RotateCw,
+  Droplet,
+  Zap,
+  Flame,
+  GlassWater,
+  Wine,
+} from "lucide-react-native";
+import {
+  AppHeader,
+  GlassCard,
+  PrimaryButton,
+  SegmentedToggle,
+  ScreenContainer,
+} from "../components/ui";
 import { addFavoriteSync } from "../reducers/favorites";
+import { colors, radius, spacing, typography } from "../theme";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-function safeText(v, fallback = "—") {
+function safeText(v: any, fallback = "—") {
   if (typeof v === "string") return v;
   if (typeof v === "number") return String(v);
   if (v == null) return fallback;
   return JSON.stringify(v);
 }
 
-// ─── Tag input component ────────────────────────────────────────────────────
+// ─── Tag Input ───────────────────────────────────────────────────────────────
 
-function TagInput({ label, placeholder, tags, onTagsChange }) {
+type TagInputProps = {
+  label: string;
+  placeholder: string;
+  tags: string[];
+  onTagsChange: (next: string[]) => void;
+};
+
+function TagInput({ label, placeholder, tags, onTagsChange }: TagInputProps) {
   const [inputValue, setInputValue] = useState("");
-  const inputRef = useRef(null);
+  const inputRef = useRef<TextInput | null>(null);
 
-  function addTag(raw) {
+  function addTag(raw: string) {
     const parts = raw
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
-
     if (parts.length === 0) return;
-
     const next = [...tags];
     parts.forEach((p) => {
       if (!next.includes(p)) next.push(p);
     });
-
     onTagsChange(next);
     setInputValue("");
   }
 
-  function removeTag(tag) {
+  function removeTag(tag: string) {
     onTagsChange(tags.filter((t) => t !== tag));
   }
 
   function handleAdd() {
     if (!inputValue.trim()) return;
-
     addTag(inputValue);
-
-    // ✅ garde le clavier ouvert + remet le focus direct
-    requestAnimationFrame(() => {
-      inputRef.current?.focus?.();
-    });
+    requestAnimationFrame(() => inputRef.current?.focus?.());
   }
 
   return (
     <View style={ti.wrapper}>
-      <Text style={ti.label}>{label}</Text>
+      <Text style={[typography.labelLg, ti.label]}>{label}</Text>
 
-      <View style={ti.box}>
-        {tags.map((tag) => (
-          <TouchableOpacity
-            key={tag}
-            style={ti.tag}
-            onPress={() => removeTag(tag)}
-            activeOpacity={0.9}
-          >
-            <Text style={ti.tagText}>{tag}</Text>
-            <Text style={ti.tagX}> ✕</Text>
-          </TouchableOpacity>
-        ))}
+      <GlassCard variant="default" borderRadius={radius.lg} style={ti.box}>
+        {tags.length > 0 && (
+          <View style={ti.tagsRow}>
+            {tags.map((tag) => (
+              <Pressable
+                key={tag}
+                onPress={() => removeTag(tag)}
+                style={({ pressed }) => [
+                  ti.tag,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Text style={ti.tagText}>{tag}</Text>
+                <X size={12} color={colors.primary} strokeWidth={2.5} />
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         <View style={ti.inputRow}>
           <TextInput
@@ -87,140 +110,125 @@ function TagInput({ label, placeholder, tags, onTagsChange }) {
             style={ti.input}
             value={inputValue}
             onChangeText={setInputValue}
-            placeholder={placeholder}
-            placeholderTextColor="rgba(255,216,244,0.4)"
+            placeholder={tags.length > 0 ? "" : placeholder}
+            placeholderTextColor={colors.onSurfaceVariant + "99"}
             returnKeyType="done"
-            blurOnSubmit
-            onSubmitEditing={() => Keyboard.dismiss()} // ✅ Done/OK = ferme seulement
+            blurOnSubmit={false}
+            onSubmitEditing={handleAdd}
           />
 
-          <TouchableOpacity
-            style={[ti.addBtn, !inputValue.trim() && ti.addBtnDisabled]}
-            onPress={handleAdd} // ✅ ajoute sans fermer
+          <Pressable
+            onPress={handleAdd}
             disabled={!inputValue.trim()}
-            activeOpacity={0.92}
+            style={({ pressed }) => [
+              ti.addBtn,
+              !inputValue.trim() && ti.addBtnDisabled,
+              { opacity: pressed ? 0.85 : 1 },
+            ]}
           >
-            <LinearGradient
-              colors={
-                inputValue.trim()
-                  ? ["rgba(255,79,216,0.22)", "rgba(255,79,216,0.08)"]
-                  : ["rgba(58,16,64,0.6)", "rgba(58,16,64,0.6)"]
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={ti.addBtnGrad}
-            >
-              <Text style={ti.addBtnText}>Ajouter</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+            <Plus size={14} color={colors.primary} strokeWidth={2.5} />
+            <Text style={ti.addBtnText}>Ajouter</Text>
+          </Pressable>
         </View>
-      </View>
+      </GlassCard>
     </View>
   );
 }
 
-const ti = StyleSheet.create({
-  wrapper: { marginTop: 14 },
-  label: {
-    color: "#ffd8f4",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginBottom: 8,
-  },
-  box: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    backgroundColor: "rgba(21,0,31,0.60)",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.5)",
-    padding: 10,
-    minHeight: 48,
-    alignItems: "center",
-  },
-  tag: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,79,216,0.18)",
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "#ff4fd8",
-  },
-  tagText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-  tagX: { color: "#ff4fd8", fontSize: 11, fontWeight: "900" },
+// ─── Selector Card (Format + Force) ──────────────────────────────────────────
 
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexGrow: 1,
-    minWidth: 170,
-  },
-  input: {
-    flex: 1,
-    minWidth: 110,
-    color: "#fff",
-    fontSize: 13,
-    paddingVertical: 2,
-  },
+type SelectorCardProps = {
+  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  label: string;
+  active: boolean;
+  accentColor?: string;
+  onPress: () => void;
+};
 
-  addBtn: {
-    borderRadius: 999,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#ff4fd8",
-  },
-  addBtnDisabled: { opacity: 0.5 },
-  addBtnGrad: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-  },
-  addBtnText: {
-    color: "#ffd8f4",
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
-});
+function SelectorCard({
+  icon: Icon,
+  label,
+  active,
+  accentColor = colors.primary,
+  onPress,
+}: SelectorCardProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        { flex: 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
+      ]}
+    >
+      <View
+        style={[
+          sel.card,
+          active && {
+            borderColor: accentColor,
+            borderWidth: 2,
+            backgroundColor: hexA(accentColor, 0.15),
+            shadowColor: accentColor,
+            shadowOpacity: 0.4,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: 8,
+          },
+        ]}
+      >
+        <Icon
+          size={28}
+          color={active ? accentColor : colors.onSurfaceVariant}
+          strokeWidth={active ? 2.5 : 2}
+        />
+        <Text
+          style={[
+            typography.titleMd,
+            {
+              color: active ? colors.onSurface : colors.onSurfaceVariant,
+              fontWeight: active ? "700" : "500",
+            },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function hexA(hex: string, alpha: number): string {
+  if (hex.startsWith("rgba") || hex.startsWith("rgb")) return hex;
+  const c = hex.replace("#", "");
+  const full =
+    c.length === 3 ? c.split("").map((x) => x + x).join("") : c;
+  const r = parseInt(full.substring(0, 2), 16);
+  const g = parseInt(full.substring(2, 4), 16);
+  const b = parseInt(full.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
-export default function AIRecipeScreen({ navigation }) {
+
+export default function AIRecipeScreen({ navigation }: any) {
   const dispatch = useDispatch();
 
-  const [tasteTags, setTasteTags] = useState([]);
-  const [ingredientTags, setIngredientTags] = useState([]);
-  const [constraintTags, setConstraintTags] = useState([]);
+  const [tasteTags, setTasteTags] = useState<string[]>([]);
+  const [ingredientTags, setIngredientTags] = useState<string[]>([]);
+  const [constraintTags, setConstraintTags] = useState<string[]>([]);
 
   const [isLongDrink, setIsLongDrink] = useState(true);
   const [isMocktail, setIsMocktail] = useState(false);
-  const [strength, setStrength] = useState("normal");
-  const [toggleWidth, setToggleWidth] = useState(0);
+  const [strength, setStrength] = useState<"léger" | "normal" | "fort">(
+    "normal"
+  );
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [recipe, setRecipe] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [recipe, setRecipe] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
-
-  const toggleSlide = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.spring(toggleSlide, {
-      toValue: isMocktail ? 1 : 0,
-      friction: 8,
-      tension: 100,
-      useNativeDriver: false,
-    }).start();
-  }, [isMocktail]);
 
   const canGenerate = useMemo(
     () => tasteTags.length > 0 || ingredientTags.length > 0,
-    [tasteTags, ingredientTags],
+    [tasteTags, ingredientTags]
   );
 
   async function generate(openModal = true) {
@@ -251,11 +259,10 @@ export default function AIRecipeScreen({ navigation }) {
       setRecipe(data.recipe);
       if (openModal) setModalVisible(true);
 
-      // Vider tous les champs après génération réussie
       setTasteTags([]);
       setIngredientTags([]);
       setConstraintTags([]);
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message || "Erreur réseau");
     } finally {
       setLoading(false);
@@ -264,7 +271,6 @@ export default function AIRecipeScreen({ navigation }) {
 
   function onSaveFavorite() {
     if (!recipe) return;
-
     const favorite = {
       id: `ai_${Date.now()}`,
       source: "ai",
@@ -274,75 +280,53 @@ export default function AIRecipeScreen({ navigation }) {
         "https://www.thecocktaildb.com/images/media/drink/5noda61589575158.jpg",
       recipe,
     };
-
     dispatch(addFavoriteSync(favorite) as any);
-    Alert.alert("✅ Ajouté aux favoris", "Votre recette IA a été sauvegardée.");
+    Alert.alert("✓ Ajouté aux favoris", "Votre recette IA a été sauvegardée.");
     setModalVisible(false);
   }
 
   return (
-    <LinearGradient
-      colors={["#0d0014", "#2a0025", "#1a0020"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.container}
-    >
-      <StatusBar style="light" />
-
-      {/* ── Header ── */}
-      <View style={s.headerBar}>
-        <Text style={s.headerTitle}>Mixologue IA</Text>
-      </View>
+    <View style={s.root}>
+      <AppHeader onAvatarPress={() => navigation.navigate("Profile")} />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
         contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Alcohol toggle ── */}
-        <View
-          style={s.toggleRow}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            setToggleWidth(w);
-          }}
-        >
-          {toggleWidth > 0 && (
-            <Animated.View
-              style={[
-                s.slideIndicator,
-                {
-                  width: (toggleWidth - 8) / 2,
-                  transform: [
-                    {
-                      translateX: toggleSlide.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, (toggleWidth - 8) / 2],
-                      }),
-                    },
-                  ],
-                },
-              ]}
+        {/* ── Hero ── */}
+        <View style={s.hero}>
+          <ImageBackground
+            source={require("../assets/cocktail.png")}
+            style={s.heroImage}
+            imageStyle={{ borderRadius: radius.xxl }}
+          >
+            <LinearGradient
+              colors={["rgba(22,17,27,0.05)", "rgba(22,17,27,0.95)"]}
+              style={[StyleSheet.absoluteFillObject, { borderRadius: radius.xxl }]}
             />
-          )}
-          <TouchableOpacity
-            style={s.toggleBtn}
-            onPress={() => setIsMocktail(false)}
-          >
-            <Text style={[s.toggleText, !isMocktail && s.toggleTextActive]}>
-              Avec Alcool
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={s.toggleBtn}
-            onPress={() => setIsMocktail(true)}
-          >
-            <Text style={[s.toggleText, isMocktail && s.toggleTextActive]}>
-              Sans Alcool
-            </Text>
-          </TouchableOpacity>
+            <View style={s.heroContent}>
+              <Text style={[typography.displayMd, s.heroTitle]}>
+                Mixologue IA
+              </Text>
+              <Text style={[typography.labelLg, s.heroSub]}>
+                Créez votre signature
+              </Text>
+            </View>
+          </ImageBackground>
         </View>
+
+        {/* ── Avec / Sans alcool ── */}
+        <SegmentedToggle
+          segments={[
+            { value: "alcohol", label: "Avec Alcool" },
+            { value: "mocktail", label: "Sans Alcool" },
+          ]}
+          value={isMocktail ? "mocktail" : "alcohol"}
+          onChange={(v) => setIsMocktail(v === "mocktail")}
+          style={{ marginVertical: spacing.lg }}
+        />
 
         {/* ── Tag Inputs ── */}
         <TagInput
@@ -367,441 +351,445 @@ export default function AIRecipeScreen({ navigation }) {
         />
 
         {/* ── Format ── */}
-        <Text style={s.sectionLabel}>Format</Text>
+        <Text style={[typography.labelLg, s.sectionLabel]}>Format</Text>
         <View style={s.gridRow}>
-          {[
-            { label: "Long Drink", val: true, icon: "🥛" },
-            { label: "Short", val: false, icon: "🍸" },
-          ].map(({ label, val, icon }) => (
-            <TouchableOpacity
-              key={label}
-              style={[s.flavorCard, isLongDrink === val && s.flavorCardActive]}
-              onPress={() => setIsLongDrink(val)}
-            >
-              <Text style={s.flavorIcon}>{icon}</Text>
-              <Text
-                style={[
-                  s.flavorLabel,
-                  isLongDrink === val && s.flavorLabelActive,
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <SelectorCard
+            icon={GlassWater}
+            label="Long Drink"
+            active={isLongDrink}
+            onPress={() => setIsLongDrink(true)}
+          />
+          <SelectorCard
+            icon={Wine}
+            label="Short"
+            active={!isLongDrink}
+            onPress={() => setIsLongDrink(false)}
+          />
         </View>
 
-        {/* ── Force — only for cocktails ── */}
+        {/* ── Force ── */}
         {!isMocktail && (
           <>
-            <Text style={s.sectionLabel}>Force du Cocktail</Text>
+            <Text style={[typography.labelLg, s.sectionLabel]}>
+              Force du cocktail
+            </Text>
             <View style={s.gridRow}>
-              {[
-                { label: "Léger", val: "léger", icon: "💧" },
-                { label: "Normal", val: "normal", icon: "⚡" },
-                { label: "Fort", val: "fort", icon: "🔥" },
-              ].map(({ label, val, icon }) => (
-                <TouchableOpacity
-                  key={val}
-                  style={[s.flavorCard, strength === val && s.flavorCardActive]}
-                  onPress={() => setStrength(val)}
-                >
-                  <Text style={s.flavorIcon}>{icon}</Text>
-                  <Text
-                    style={[
-                      s.flavorLabel,
-                      strength === val && s.flavorLabelActive,
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <SelectorCard
+                icon={Droplet}
+                label="Léger"
+                active={strength === "léger"}
+                accentColor="#60a5fa"
+                onPress={() => setStrength("léger")}
+              />
+              <SelectorCard
+                icon={Zap}
+                label="Normal"
+                active={strength === "normal"}
+                accentColor="#fbbf24"
+                onPress={() => setStrength("normal")}
+              />
+              <SelectorCard
+                icon={Flame}
+                label="Fort"
+                active={strength === "fort"}
+                accentColor={colors.tertiaryContainer}
+                onPress={() => setStrength("fort")}
+              />
             </View>
           </>
         )}
 
         {!canGenerate && (
-          <Text style={s.hint}>
-            ✦ Ajoute au moins un goût ou un ingrédient pour générer
-          </Text>
+          <View style={s.hintRow}>
+            <Sparkles size={14} color={colors.primary} strokeWidth={2} />
+            <Text style={[typography.bodySm, s.hint]}>
+              Ajoute au moins un goût ou un ingrédient pour générer
+            </Text>
+          </View>
         )}
 
-        {error && <Text style={s.error}>{error}</Text>}
+        {error ? (
+          <Text style={[typography.bodySm, s.error]}>{error}</Text>
+        ) : null}
 
-        {/* ── CTA ── */}
-        <TouchableOpacity
-          style={[s.cta, (!canGenerate || loading) && s.ctaDisabled]}
-          onPress={() => generate(true)}
-          disabled={!canGenerate || loading}
-        >
-          <LinearGradient
-            colors={
-              canGenerate && !loading
-                ? ["#ff4fd8", "#ff2a6d", "#ff8a00"]
-                : ["#3a1040", "#3a1040"]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.ctaGradient}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={s.ctaIcon}>✦</Text>
-                <Text style={s.ctaText}>Surprise de l&apos;IA</Text>
-              </>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+        {canGenerate && (
+          <PrimaryButton
+            label="Générer ma recette"
+            loading={loading}
+            disabled={!canGenerate}
+            onPress={() => generate(true)}
+            icon={<Sparkles size={18} color="#fff" strokeWidth={2.5} />}
+            style={{ marginTop: spacing.lg }}
+          />
+        )}
       </ScrollView>
 
-      {/* ─── Modal ─────────────────────────────────────────────────────── */}
-      <Modal
-        transparent
-        animationType="slide"
+      {/* ── Modal ── */}
+      <RecipeModal
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={m.backdrop}>
-          <LinearGradient
-            colors={["#100018", "#1e0028", "#160020"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={m.card}
-          >
-            <LinearGradient
-              colors={["#ff4fd8", "#ff2a6d", "#ff8a00"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={m.accentLine}
-            />
-
-            <View style={m.header}>
-              <View style={m.titleBlock}>
-                <View style={m.badgeRow}>
-                  <View
-                    style={[
-                      m.badge,
-                      {
-                        backgroundColor: "rgba(255,42,109,0.25)",
-                        borderColor: "#ff2a6d",
-                      },
-                    ]}
-                  >
-                    <Text style={m.badgeText}>
-                      {isMocktail ? "SANS ALCOOL" : "ALCOOLISÉ"}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      m.badge,
-                      {
-                        backgroundColor: "rgba(255,138,0,0.2)",
-                        borderColor: "#ff8a00",
-                      },
-                    ]}
-                  >
-                    <Text style={[m.badgeText, { color: "#ff8a00" }]}>
-                      {isLongDrink ? "LONG DRINK" : "SHORT"}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={m.title}>
-                  {safeText(recipe?.name, "Recette IA")}
-                </Text>
-
-                {Array.isArray(recipe?.profile) &&
-                  recipe.profile.length > 0 && (
-                    <Text style={m.subtitle}>{recipe.profile.join(" · ")}</Text>
-                  )}
-              </View>
-
-              <TouchableOpacity
-                style={m.closeBtn}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={m.closeX}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={m.statsBar}>
-              {[
-                {
-                  icon: "🍹",
-                  label: safeText(recipe?.glass, "—").toUpperCase(),
-                },
-                { icon: "⚡", label: (strength || "normal").toUpperCase() },
-              ].map(({ icon, label }, i, arr) => (
-                <React.Fragment key={i}>
-                  <View style={m.statItem}>
-                    <Text style={m.statIcon}>{icon}</Text>
-                    <Text
-                      style={m.statLabel}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                    >
-                      {label}
-                    </Text>
-                  </View>
-                  {i < arr.length - 1 && <View style={m.statDivider} />}
-                </React.Fragment>
-              ))}
-            </View>
-
-            <View style={m.divider} />
-
-            <ScrollView
-              style={{ maxHeight: 360 }}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={m.sectionHeader}>
-                <View style={m.sectionDash} />
-                <Text style={m.sectionTitle}>Ingrédients</Text>
-              </View>
-
-              {Array.isArray(recipe?.ingredients) &&
-                recipe.ingredients.map((it, i) => (
-                  <View key={i} style={m.ingredientRow}>
-                    <View style={m.dot} />
-                    <Text style={m.ingredientName}>{safeText(it?.name)}</Text>
-                    <Text style={m.ingredientAmount}>
-                      {safeText(it?.amount)}
-                    </Text>
-                  </View>
-                ))}
-
-              <View style={[m.sectionHeader, { marginTop: 16 }]}>
-                <View style={m.sectionDash} />
-                <Text style={m.sectionTitle}>Préparation</Text>
-              </View>
-
-              {Array.isArray(recipe?.steps) &&
-                recipe.steps.map((step, i) => (
-                  <View key={i} style={m.stepRow}>
-                    <LinearGradient
-                      colors={["#ff2a6d", "#ff8a00"]}
-                      style={m.stepNum}
-                    >
-                      <Text style={m.stepNumText}>{i + 1}</Text>
-                    </LinearGradient>
-                    <Text style={m.stepText}>{safeText(step)}</Text>
-                  </View>
-                ))}
-
-              {recipe?.garnish && (
-                <>
-                  <View style={[m.sectionHeader, { marginTop: 16 }]}>
-                    <View style={m.sectionDash} />
-                    <Text style={m.sectionTitle}>Décoration</Text>
-                  </View>
-                  <View style={m.tipRow}>
-                    <Text style={m.tipBullet}>✦</Text>
-                    <Text style={m.bodyText}>{safeText(recipe.garnish)}</Text>
-                  </View>
-                </>
-              )}
-
-              {Array.isArray(recipe?.tips) && recipe.tips.length > 0 && (
-                <>
-                  <View style={[m.sectionHeader, { marginTop: 16 }]}>
-                    <View style={m.sectionDash} />
-                    <Text style={m.sectionTitle}>Conseils du Barman</Text>
-                  </View>
-                  {recipe.tips.map((t, i) => (
-                    <View key={i} style={m.tipRow}>
-                      <Text style={m.tipBullet}>✦</Text>
-                      <Text style={m.bodyText}>{safeText(t)}</Text>
-                    </View>
-                  ))}
-                </>
-              )}
-
-              <View style={{ height: 8 }} />
-            </ScrollView>
-
-            <View style={m.actions}>
-              <TouchableOpacity
-                style={m.btnBase}
-                onPress={() => generate(true)}
-                disabled={loading}
-                activeOpacity={0.92}
-              >
-                <LinearGradient
-                  colors={["#291130ff", "#451a42ff", "#811697ff"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={m.btnGrad}
-                >
-                  <View pointerEvents="none" style={m.btnGloss} />
-                  <View pointerEvents="none" style={m.btnStroke} />
-                  {loading ? (
-                    <ActivityIndicator color="#ff4fd8" size="small" />
-                  ) : (
-                    <>
-                      <Text style={[m.btnIcon, { color: "#ff4fd8" }]}>↺</Text>
-                      <Text style={m.btnTextGhost}>NOUVELLE RECETTE</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={m.btnBase}
-                onPress={onSaveFavorite}
-                activeOpacity={0.92}
-              >
-                <LinearGradient
-                  colors={["#291130ff", "#451a42ff", "#811697ff"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={m.btnGrad}
-                >
-                  <View
-                    pointerEvents="none"
-                    style={[m.btnGloss, { opacity: 0.22 }]}
-                  />
-                  <View pointerEvents="none" style={m.btnStroke} />
-                  <Text style={m.btnIcon}>♥</Text>
-                  <Text style={m.btnTextSolid}>ENREGISTRER</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-        </View>
-      </Modal>
-    </LinearGradient>
+        recipe={recipe}
+        isMocktail={isMocktail}
+        isLongDrink={isLongDrink}
+        strength={strength}
+        loading={loading}
+        onClose={() => setModalVisible(false)}
+        onRegenerate={() => generate(true)}
+        onSave={onSaveFavorite}
+      />
+    </View>
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────
+// ─── Recipe Modal ────────────────────────────────────────────────────────────
+
+type RecipeModalProps = {
+  visible: boolean;
+  recipe: any;
+  isMocktail: boolean;
+  isLongDrink: boolean;
+  strength: string;
+  loading: boolean;
+  onClose: () => void;
+  onRegenerate: () => void;
+  onSave: () => void;
+};
+
+function RecipeModal({
+  visible,
+  recipe,
+  isMocktail,
+  isLongDrink,
+  strength,
+  loading,
+  onClose,
+  onRegenerate,
+  onSave,
+}: RecipeModalProps) {
+  return (
+    <Modal
+      transparent
+      animationType="slide"
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={m.backdrop}>
+        <View style={m.card}>
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={m.accentLine}
+          />
+
+          <View style={m.header}>
+            <View style={{ flex: 1 }}>
+              <View style={m.badgeRow}>
+                <View style={[m.badge, m.badgePrimary]}>
+                  <Text style={m.badgeText}>
+                    {isMocktail ? "SANS ALCOOL" : "ALCOOLISÉ"}
+                  </Text>
+                </View>
+                <View style={[m.badge, m.badgeSecondary]}>
+                  <Text style={m.badgeTextSecondary}>
+                    {isLongDrink ? "LONG DRINK" : "SHORT"}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={[typography.headlineMd, m.title]}>
+                {safeText(recipe?.name, "Recette IA")}
+              </Text>
+
+              {Array.isArray(recipe?.profile) && recipe.profile.length > 0 && (
+                <Text style={[typography.bodySm, m.subtitle]}>
+                  {recipe.profile.join(" · ")}
+                </Text>
+              )}
+            </View>
+
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={({ pressed }) => [
+                m.closeBtn,
+                { opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <X size={16} color={colors.onSurface} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+
+          {recipe?.glass && (
+            <View style={m.statsBar}>
+              <View style={m.statItem}>
+                <GlassWater size={14} color={colors.primary} strokeWidth={2} />
+                <Text style={m.statLabel} numberOfLines={1}>
+                  {safeText(recipe?.glass).toUpperCase()}
+                </Text>
+              </View>
+              <View style={m.statDivider} />
+              <View style={m.statItem}>
+                <Zap size={14} color={colors.primary} strokeWidth={2} />
+                <Text style={m.statLabel}>{(strength || "normal").toUpperCase()}</Text>
+              </View>
+            </View>
+          )}
+
+          <ScrollView
+            style={{ maxHeight: 360 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={m.sectionHeader}>
+              <View style={m.sectionDash} />
+              <Text style={[typography.labelLg, m.sectionTitle]}>
+                Ingrédients
+              </Text>
+            </View>
+
+            {Array.isArray(recipe?.ingredients) &&
+              recipe.ingredients.map((it: any, i: number) => (
+                <View key={i} style={m.ingredientRow}>
+                  <View style={m.dot} />
+                  <Text style={[typography.bodySm, m.ingredientName]}>
+                    {safeText(it?.name)}
+                  </Text>
+                  <Text style={[typography.bodySm, m.ingredientAmount]}>
+                    {safeText(it?.amount)}
+                  </Text>
+                </View>
+              ))}
+
+            <View style={[m.sectionHeader, { marginTop: spacing.md }]}>
+              <View style={m.sectionDash} />
+              <Text style={[typography.labelLg, m.sectionTitle]}>
+                Préparation
+              </Text>
+            </View>
+
+            {Array.isArray(recipe?.steps) &&
+              recipe.steps.map((step: any, i: number) => (
+                <View key={i} style={m.stepRow}>
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    style={m.stepNum}
+                  >
+                    <Text style={m.stepNumText}>{i + 1}</Text>
+                  </LinearGradient>
+                  <Text style={[typography.bodySm, m.stepText]}>
+                    {safeText(step)}
+                  </Text>
+                </View>
+              ))}
+
+            {recipe?.garnish ? (
+              <>
+                <View style={[m.sectionHeader, { marginTop: spacing.md }]}>
+                  <View style={m.sectionDash} />
+                  <Text style={[typography.labelLg, m.sectionTitle]}>
+                    Décoration
+                  </Text>
+                </View>
+                <View style={m.tipRow}>
+                  <Sparkles size={12} color={colors.primary} strokeWidth={2} />
+                  <Text style={[typography.bodySm, m.bodyText]}>
+                    {safeText(recipe.garnish)}
+                  </Text>
+                </View>
+              </>
+            ) : null}
+
+            {Array.isArray(recipe?.tips) && recipe.tips.length > 0 ? (
+              <>
+                <View style={[m.sectionHeader, { marginTop: spacing.md }]}>
+                  <View style={m.sectionDash} />
+                  <Text style={[typography.labelLg, m.sectionTitle]}>
+                    Conseils du barman
+                  </Text>
+                </View>
+                {recipe.tips.map((t: any, i: number) => (
+                  <View key={i} style={m.tipRow}>
+                    <Sparkles size={12} color={colors.primary} strokeWidth={2} />
+                    <Text style={[typography.bodySm, m.bodyText]}>
+                      {safeText(t)}
+                    </Text>
+                  </View>
+                ))}
+              </>
+            ) : null}
+
+            <View style={{ height: spacing.xs }} />
+          </ScrollView>
+
+          <View style={m.actions}>
+            <PrimaryButton
+              variant="secondary"
+              label="Nouvelle"
+              size="md"
+              onPress={onRegenerate}
+              loading={loading}
+              icon={<RotateCw size={14} color={colors.primary} strokeWidth={2.5} />}
+              fullWidth={false}
+              style={{ flex: 1 }}
+            />
+            <PrimaryButton
+              label="Enregistrer"
+              size="md"
+              onPress={onSave}
+              icon={<Heart size={14} color="#fff" strokeWidth={2.5} />}
+              fullWidth={false}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  container: { flex: 1 },
-  headerBar: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  headerBackBtn: {
-    // Le composant BackButton gère son propre style
-  },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-    textAlign: "center",
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
   scroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.containerMargin,
     paddingBottom: 120,
+    paddingTop: spacing.md,
   },
-  toggleRow: {
-    position: "relative",
-    flexDirection: "row",
-    backgroundColor: "rgba(21,0,31,0.70)",
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.3)",
-    padding: 4,
-    marginBottom: 4,
+  hero: {
+    height: 180,
+    borderRadius: radius.xxl,
+    overflow: "hidden",
   },
-  slideIndicator: {
-    position: "absolute",
-    left: 4,
-    top: 4,
-    bottom: 4,
-    backgroundColor: "#ff2a6d",
-    borderRadius: 999,
-  },
-  toggleBtn: {
+  heroImage: {
     flex: 1,
-    paddingVertical: 11,
-    borderRadius: 999,
-    alignItems: "center",
-    zIndex: 1,
+    justifyContent: "flex-end",
   },
-  toggleText: {
-    color: "rgba(255,216,244,0.55)",
-    fontWeight: "700",
-    fontSize: 14,
+  heroContent: {
+    padding: spacing.lg,
   },
-  toggleTextActive: { color: "#fff" },
-  sectionLabel: {
-    color: "#ffd8f4",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.2,
+  heroTitle: {
+    color: "#fff",
+    marginBottom: 6,
+  },
+  heroSub: {
+    color: colors.primary,
     textTransform: "uppercase",
-    marginTop: 20,
-    marginBottom: 10,
+    letterSpacing: 1.5,
+    fontSize: 11,
+  },
+  sectionLabel: {
+    color: colors.onSurfaceVariant,
+    textTransform: "uppercase",
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    fontSize: 11,
+    letterSpacing: 1.2,
   },
   gridRow: {
     flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
+    gap: spacing.sm,
   },
-  flavorCard: {
-    flex: 1,
-    minWidth: 80,
-    backgroundColor: "rgba(21,0,31,0.60)",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.35)",
-    paddingVertical: 16,
-    alignItems: "center",
-    gap: 6,
-  },
-  flavorCardActive: {
-    borderColor: "#ff2a6d",
-    backgroundColor: "rgba(255,42,109,0.18)",
-  },
-  flavorIcon: { fontSize: 22 },
-  flavorLabel: {
-    color: "rgba(255,216,244,0.55)",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  flavorLabelActive: { color: "#fff" },
-  cta: {
-    marginTop: 28,
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  ctaDisabled: { opacity: 0.45 },
-  ctaGradient: {
-    paddingVertical: 18,
+  hintRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+    marginTop: spacing.lg,
     justifyContent: "center",
-    gap: 8,
-  },
-  ctaIcon: { color: "#fff", fontSize: 16 },
-  ctaText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 17,
-    letterSpacing: 0.3,
   },
   hint: {
-    color: "rgba(255,228,184,0.6)",
-    fontSize: 12,
-    marginTop: 16,
-    textAlign: "center",
-    letterSpacing: 0.2,
+    color: colors.onSurfaceVariant,
+    fontStyle: "italic",
   },
   error: {
-    color: "#ffb3df",
-    marginTop: 12,
+    color: colors.error,
+    marginTop: spacing.sm,
     textAlign: "center",
+  },
+});
+
+const ti = StyleSheet.create({
+  wrapper: {
+    marginTop: spacing.md,
+  },
+  label: {
+    color: colors.onSurfaceVariant,
+    textTransform: "uppercase",
+    marginBottom: spacing.xs,
+    fontSize: 11,
+    letterSpacing: 1.2,
+  },
+  box: {
+    padding: spacing.sm,
+    minHeight: 56,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: spacing.xs,
+  },
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(221, 183, 255, 0.18)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primary,
+  },
+  tagText: {
+    color: colors.onSurface,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  input: {
+    flex: 1,
+    color: colors.onSurface,
+    fontSize: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(221, 183, 255, 0.16)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(221, 183, 255, 0.4)",
+  },
+  addBtnDisabled: {
+    opacity: 0.4,
+  },
+  addBtnText: {
+    color: colors.primary,
+    fontSize: 12,
     fontWeight: "700",
+  },
+});
+
+const sel = StyleSheet.create({
+  card: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.glassSurface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
   },
 });
 
@@ -810,88 +798,99 @@ const m = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.72)",
     justifyContent: "flex-end",
-    paddingBottom: 16,
   },
   card: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    borderWidth: 1,
-    borderColor: "rgba(255,79,216,0.25)",
+    backgroundColor: colors.glassSurface,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorderStrong,
     overflow: "hidden",
-    paddingBottom: 18,
+    paddingBottom: spacing.lg,
   },
-  accentLine: { height: 3, width: "100%" },
+  accentLine: {
+    height: 3,
+    width: "100%",
+  },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    gap: 12,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  titleBlock: { flex: 1 },
-  badgeRow: { flexDirection: "row", gap: 6, marginBottom: 8 },
+  badgeRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: spacing.xs,
+  },
   badge: {
-    borderRadius: 999,
-    paddingVertical: 3,
     paddingHorizontal: 10,
-    borderWidth: 1,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  badgePrimary: {
+    backgroundColor: "rgba(221, 183, 255, 0.16)",
+    borderColor: colors.primary,
+  },
+  badgeSecondary: {
+    backgroundColor: "rgba(255, 79, 114, 0.16)",
+    borderColor: colors.tertiaryContainer,
   },
   badgeText: {
-    color: "#ff4fd8",
+    color: colors.primary,
     fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.1,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  badgeTextSecondary: {
+    color: colors.tertiary,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1,
   },
   title: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "900",
-    lineHeight: 30,
-    letterSpacing: -0.3,
+    color: colors.onSurface,
   },
   subtitle: {
-    color: "rgba(255,216,244,0.55)",
-    fontSize: 12,
+    color: colors.onSurfaceVariant,
     marginTop: 4,
     fontStyle: "italic",
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,79,216,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,79,216,0.4)",
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glassFill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorderStrong,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 4,
   },
-  closeX: { color: "rgba(255,216,244,0.8)", fontWeight: "900", fontSize: 13 },
   statsBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 20,
-    marginBottom: 14,
-    backgroundColor: "rgba(255,79,216,0.07)",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,79,216,0.2)",
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.glassFill,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: spacing.md,
   },
   statItem: {
     flex: 1,
-    alignItems: "center",
     flexDirection: "row",
-    gap: 5,
-    minWidth: 0,
+    alignItems: "center",
+    gap: 6,
   },
-  statIcon: { fontSize: 12 },
   statLabel: {
     flexShrink: 1,
-    minWidth: 0,
-    color: "rgba(255,216,244,0.7)",
+    color: colors.onSurfaceVariant,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.5,
@@ -899,56 +898,54 @@ const m = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 16,
-    backgroundColor: "rgba(255,79,216,0.3)",
-    marginHorizontal: 10,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,79,216,0.15)",
-    marginHorizontal: 20,
-    marginBottom: 4,
+    backgroundColor: colors.outlineVariant,
+    marginHorizontal: spacing.sm,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
   },
   sectionDash: {
     width: 22,
     height: 2,
-    backgroundColor: "#ff2a6d",
+    backgroundColor: colors.primary,
     borderRadius: 2,
   },
   sectionTitle: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 14,
-    letterSpacing: 0.3,
+    color: colors.onSurface,
+    fontSize: 13,
   },
   ingredientRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,79,216,0.08)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.outlineVariant,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#ff2a6d",
+    backgroundColor: colors.primary,
     marginRight: 10,
   },
-  ingredientName: { color: "#ffd8f4", fontSize: 13, flex: 1 },
-  ingredientAmount: { color: "#ff4fd8", fontWeight: "800", fontSize: 13 },
+  ingredientName: {
+    color: colors.onSurface,
+    flex: 1,
+  },
+  ingredientAmount: {
+    color: colors.primary,
+    fontWeight: "700",
+  },
   stepRow: {
     flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
     alignItems: "flex-start",
   },
   stepNum: {
@@ -957,81 +954,33 @@ const m = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
     marginTop: 1,
   },
-  stepNumText: { color: "#fff", fontSize: 11, fontWeight: "900" },
-  stepText: { color: "#ffd8f4", flex: 1, lineHeight: 21, fontSize: 13 },
+  stepNumText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  stepText: {
+    color: colors.onSurface,
+    flex: 1,
+  },
   tipRow: {
     flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 20,
-    marginBottom: 4,
+    gap: 6,
+    paddingHorizontal: spacing.lg,
+    marginBottom: 6,
+    alignItems: "flex-start",
   },
-  tipBullet: { color: "#ff4fd8", fontSize: 10, marginTop: 4 },
   bodyText: {
-    color: "rgba(255,216,244,0.75)",
-    lineHeight: 21,
-    fontSize: 13,
+    color: colors.onSurfaceVariant,
     flex: 1,
+    marginTop: 2,
   },
   actions: {
-    paddingHorizontal: 20,
-    marginTop: 14,
     flexDirection: "row",
-    gap: 10,
-    paddingBottom: 18,
-  },
-  btnBase: {
-    flex: 1,
-    borderRadius: 18,
-    overflow: "hidden",
-    marginBottom: 14,
-    shadowColor: "#000000ff",
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  btnGrad: {
-    height: 54,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  btnIcon: { color: "#fff", fontSize: 20, fontWeight: "900" },
-  btnTextSolid: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "900",
-    letterSpacing: 0.9,
-  },
-  btnTextGhost: {
-    color: "rgba(255,216,244,0.85)",
-    fontSize: 13,
-    fontWeight: "900",
-    letterSpacing: 0.9,
-  },
-  btnGloss: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    height: "55%",
-    backgroundColor: "rgba(255,255,255,0.16)",
-    transform: [{ skewY: "-10deg" }],
-  },
-  btnStroke: {
-    position: "absolute",
-    left: 1,
-    right: 1,
-    top: 1,
-    bottom: 1,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.md,
   },
 });

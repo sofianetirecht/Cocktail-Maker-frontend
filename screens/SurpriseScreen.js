@@ -3,25 +3,31 @@ import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Image,
   Dimensions,
   Animated,
   PanResponder,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useDispatch } from "react-redux";
+import { Heart, X, RotateCw } from "lucide-react-native";
 import { addFavoriteSync } from "../reducers/favorites";
-// backend render :
+import {
+  AppHeader,
+  SegmentedToggle,
+  Chip,
+  PrimaryButton,
+} from "../components/ui";
+import { colors, radius, spacing, typography } from "../theme";
+
 const API_URL = "https://cocktail-maker-backend.onrender.com";
-// 5G local
-// const API_URL = "http://172.20.10.2:3000";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.35;
 const FETCH_TIMEOUT_MS = 9000;
 const MIN_EMPTY_FETCHES_BEFORE_END = 2;
+const CARD_WIDTH = SCREEN_WIDTH - spacing.containerMargin * 2;
 
 export default function SurpriseScreen({ navigation }) {
   const [cocktails, setCocktails] = useState([]);
@@ -30,7 +36,6 @@ export default function SurpriseScreen({ navigation }) {
   const [showEndMessage, setShowEndMessage] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMocktailOnly, setIsMocktailOnly] = useState(false);
-  const [toggleWidth, setToggleWidth] = useState(0);
   const dispatch = useDispatch();
   const cocktailsRef = useRef([]);
   const currentIndexRef = useRef(0);
@@ -39,22 +44,11 @@ export default function SurpriseScreen({ navigation }) {
   const loadingMoreRef = useRef(false);
   const emptyFetchStreakRef = useRef(0);
 
-  // Animation
   const pan = useRef(new Animated.ValueXY()).current;
   const swipeDirection = useRef(new Animated.Value(0)).current;
-  const toggleSlide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadInitialCocktails();
-  }, [isMocktailOnly]);
-
-  useEffect(() => {
-    Animated.spring(toggleSlide, {
-      toValue: isMocktailOnly ? 1 : 0,
-      friction: 8,
-      tension: 100,
-      useNativeDriver: false,
-    }).start();
   }, [isMocktailOnly]);
 
   useEffect(() => {
@@ -79,7 +73,6 @@ export default function SurpriseScreen({ navigation }) {
 
     let firstBatch = await fetchCocktailBatch(4, isMocktailOnly, []);
     if (firstBatch.length === 0) {
-      // petit retry pour éviter le faux "c'est tout" sur latence réseau
       firstBatch = await fetchCocktailBatch(4, isMocktailOnly, []);
     }
 
@@ -93,7 +86,6 @@ export default function SurpriseScreen({ navigation }) {
     swipeDirection.setValue(0);
     setLoading(false);
 
-    // Charger le reste en arrière-plan (mode alcool/sans alcool)
     fetchAndAppendMore(4, loadToken);
   };
 
@@ -109,7 +101,7 @@ export default function SurpriseScreen({ navigation }) {
       const more = await fetchCocktailBatch(
         count,
         isMocktailOnlyRef.current,
-        excluded,
+        excluded
       );
 
       if (expectedLoadToken && loadTokenRef.current !== expectedLoadToken)
@@ -155,12 +147,11 @@ export default function SurpriseScreen({ navigation }) {
   const fetchCocktailBatch = async (
     count = 3,
     mocktailOnly = false,
-    excludeIds = [],
+    excludeIds = []
   ) => {
     const alcoholQuery = mocktailOnly ? "without" : "with";
     const seenIds = new Set(excludeIds.map((id) => String(id)));
 
-    // 1) Tentative optimisée: une seule requête batch vers le backend
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -169,22 +160,20 @@ export default function SurpriseScreen({ navigation }) {
         count: String(count),
         alcohol: alcoholQuery,
       });
-
-      if (excludeIds.length > 0) {
+      if (excludeIds.length > 0)
         params.set("excludeIds", excludeIds.join(","));
-      }
 
       const response = await fetch(
         `${API_URL}/cocktail/surprise/batch?${params.toString()}`,
-        { signal: controller.signal },
+        { signal: controller.signal }
       );
 
       if (response.ok) {
         const data = await response.json();
-        const cocktails = Array.isArray(data?.cocktails) ? data.cocktails : [];
+        const cocktailsResp = Array.isArray(data?.cocktails) ? data.cocktails : [];
 
         const unique = [];
-        for (const cocktail of cocktails) {
+        for (const cocktail of cocktailsResp) {
           const id = String(cocktail?.id || "");
           if (!id || seenIds.has(id)) continue;
           if (!matchAlcoholFilter(cocktail, mocktailOnly)) continue;
@@ -195,34 +184,30 @@ export default function SurpriseScreen({ navigation }) {
           if (unique.length >= count) break;
         }
 
-        if (unique.length > 0) {
-          return unique;
-        }
+        if (unique.length > 0) return unique;
       }
-    } catch (e) {
-      // fallback plus bas
+    } catch {
+      // fallback below
     } finally {
       clearTimeout(timeout);
     }
 
-    // 2) Fallback robuste: quelques requêtes unitaires
     const fallbackBatch = [];
     let attempts = 0;
     const maxAttempts = count * 6;
 
     while (fallbackBatch.length < count && attempts < maxAttempts) {
       attempts += 1;
-
       const fallbackController = new AbortController();
       const fallbackTimeout = setTimeout(
         () => fallbackController.abort(),
-        FETCH_TIMEOUT_MS,
+        FETCH_TIMEOUT_MS
       );
 
       try {
         const fallbackResponse = await fetch(
           `${API_URL}/cocktail/surprise?alcohol=${alcoholQuery}&excludeIds=${encodeURIComponent(Array.from(seenIds).join(","))}`,
-          { signal: fallbackController.signal },
+          { signal: fallbackController.signal }
         );
 
         if (!fallbackResponse.ok) continue;
@@ -236,8 +221,8 @@ export default function SurpriseScreen({ navigation }) {
 
         seenIds.add(id);
         fallbackBatch.push(cocktail);
-      } catch (e) {
-        // ignore pour continuer les tentatives
+      } catch {
+        // ignore
       } finally {
         clearTimeout(fallbackTimeout);
       }
@@ -247,6 +232,7 @@ export default function SurpriseScreen({ navigation }) {
   };
 
   const currentCocktail = cocktails[currentIndex];
+  const nextCocktail = cocktails[currentIndex + 1];
 
   const panResponder = useRef(
     PanResponder.create({
@@ -260,13 +246,10 @@ export default function SurpriseScreen({ navigation }) {
       }),
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dx > SWIPE_THRESHOLD) {
-          // Swipe RIGHT = LIKE
           swipeRight();
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
-          // Swipe LEFT = DISLIKE
           swipeLeft();
         } else {
-          // Reset position
           Animated.spring(pan, {
             toValue: { x: 0, y: 0 },
             friction: 5,
@@ -274,7 +257,7 @@ export default function SurpriseScreen({ navigation }) {
           }).start();
         }
       },
-    }),
+    })
   ).current;
 
   const swipeRight = () => {
@@ -283,7 +266,6 @@ export default function SurpriseScreen({ navigation }) {
       duration: 300,
       useNativeDriver: false,
     }).start(() => {
-      // Ajouter aux favoris
       const activeCocktail = cocktailsRef.current[currentIndexRef.current];
       if (activeCocktail) {
         dispatch(
@@ -292,16 +274,11 @@ export default function SurpriseScreen({ navigation }) {
             nom: activeCocktail.nom,
             image: activeCocktail.image,
             type: activeCocktail.type,
-          }),
+          })
         );
       }
       nextCard();
     });
-  };
-
-  const handleAlcoholToggle = (mocktailOnly) => {
-    if (mocktailOnly === isMocktailOnly) return;
-    setIsMocktailOnly(mocktailOnly);
   };
 
   const swipeLeft = () => {
@@ -319,13 +296,11 @@ export default function SurpriseScreen({ navigation }) {
     setCurrentIndex((prev) => prev + 1);
     currentIndexRef.current = nextIdx;
 
-    // Reset après changement d'index pour éviter le flash de retour
     requestAnimationFrame(() => {
       pan.setValue({ x: 0, y: 0 });
       swipeDirection.setValue(0);
     });
 
-    // Précharger plus de cocktails si on approche de la fin
     if (nextIdx >= cocktailsRef.current.length - 2) {
       setShowEndMessage(false);
       const appended = await fetchAndAppendMore(6);
@@ -334,7 +309,7 @@ export default function SurpriseScreen({ navigation }) {
         const retryAppended = await fetchAndAppendMore(8);
         setShowEndMessage(
           retryAppended === 0 &&
-            emptyFetchStreakRef.current >= MIN_EMPTY_FETCHES_BEFORE_END,
+            emptyFetchStreakRef.current >= MIN_EMPTY_FETCHES_BEFORE_END
         );
       }
     }
@@ -354,15 +329,11 @@ export default function SurpriseScreen({ navigation }) {
       setShowEndMessage(
         appended === 0 &&
           currentIndexRef.current >= cocktailsRef.current.length &&
-          emptyFetchStreakRef.current >= MIN_EMPTY_FETCHES_BEFORE_END,
+          emptyFetchStreakRef.current >= MIN_EMPTY_FETCHES_BEFORE_END
       );
     })();
   }, [currentIndex, cocktails.length, loading]);
 
-  const handleLikePress = () => swipeRight();
-  const handleDislikePress = () => swipeLeft();
-
-  // Animations
   const rotate = pan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
     outputRange: ["-12deg", "0deg", "12deg"],
@@ -382,388 +353,312 @@ export default function SurpriseScreen({ navigation }) {
   });
 
   return (
-    <LinearGradient
-      colors={["#0d0014", "#2a0025", "#1a0020"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.container}
-    >
-      <StatusBar style="light" />
+    <View style={s.root}>
+      <AppHeader onAvatarPress={() => navigation.navigate("Profile")} />
 
-      {/* ── Header ── */}
-      <View style={s.headerBar}>
-        <Text style={s.headerTitle}>Cocktail Match ❤️ </Text>
-        <Text style={s.headerSub}>Swipe pour trouver l'amour</Text>
-      </View>
+      <View style={s.content}>
+        {/* ── Hero compact ── */}
+        <View style={s.hero}>
+          <Text style={[typography.headlineMd, s.heroTitle]}>
+            Cocktail Match <Text style={s.heart}>❤️</Text>
+          </Text>
+          <Text style={[typography.bodySm, s.heroSub]}>
+            Swipe pour trouver l'amour
+          </Text>
+        </View>
 
-      {/* ── Alcohol toggle ── */}
-      <View style={s.toggleWrap}>
-        <View
-          style={s.toggleRow}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            setToggleWidth(w);
-          }}
-        >
-          {toggleWidth > 0 && (
-            <Animated.View
-              style={[
-                s.slideIndicator,
-                {
-                  width: (toggleWidth - 8) / 2,
-                  transform: [
+        {/* ── Toggle ── */}
+        <SegmentedToggle
+          segments={[
+            { value: "alcohol", label: "Avec alcool" },
+            { value: "mocktail", label: "Sans alcool" },
+          ]}
+          value={isMocktailOnly ? "mocktail" : "alcohol"}
+          onChange={(v) => setIsMocktailOnly(v === "mocktail")}
+          style={{ marginBottom: spacing.md }}
+        />
+
+        {/* ── Card stack + straddling buttons ── */}
+        <View style={s.stackWrapper}>
+          <View style={s.cardArea}>
+            {loading && (
+              <View style={s.centered}>
+                <ActivityIndicator color={colors.primary} size="large" />
+                <Text style={[typography.bodyMd, s.loadingText]}>
+                  Chargement des cocktails…
+                </Text>
+              </View>
+            )}
+
+            {!loading &&
+              !loadingMore &&
+              showEndMessage &&
+              currentIndex >= cocktails.length && (
+                <View style={s.centered}>
+                  <View style={s.emptyCard}>
+                    <Text style={s.emptyIcon}>🎉</Text>
+                    <Text style={[typography.headlineSm, s.emptyTitle]}>
+                      C'est tout pour l'instant
+                    </Text>
+                    <Text style={[typography.bodySm, s.emptyText]}>
+                      Tu as exploré tous les cocktails. Recharge pour en voir plus.
+                    </Text>
+                    <PrimaryButton
+                      label="Recharger"
+                      onPress={loadInitialCocktails}
+                      icon={
+                        <RotateCw size={16} color="#fff" strokeWidth={2.5} />
+                      }
+                      fullWidth={false}
+                      size="md"
+                      style={{ marginTop: spacing.md }}
+                    />
+                  </View>
+                </View>
+              )}
+
+            {!loading && loadingMore && currentIndex >= cocktails.length && (
+              <View style={s.centered}>
+                <ActivityIndicator color={colors.primary} size="large" />
+                <Text style={[typography.bodyMd, s.loadingText]}>
+                  Chargement de nouveaux cocktails…
+                </Text>
+              </View>
+            )}
+
+            {!loading && currentCocktail && (
+              <View style={s.cardContainer}>
+                {nextCocktail && (
+                  <View
+                    style={[s.card, s.cardBehind]}
+                    key={`next-${currentIndex + 1}`}
+                  >
+                    <Image
+                      source={{ uri: nextCocktail.image }}
+                      style={s.cardImage}
+                    />
+                  </View>
+                )}
+
+                <Animated.View
+                  key={`current-${currentIndex}`}
+                  style={[
+                    s.card,
                     {
-                      translateX: toggleSlide.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, (toggleWidth - 8) / 2],
-                      }),
+                      transform: [
+                        { translateX: pan.x },
+                        { translateY: pan.y },
+                        { rotate },
+                      ],
                     },
-                  ],
-                },
-              ]}
-            />
-          )}
-          <TouchableOpacity
-            style={s.toggleBtn}
-            onPress={() => handleAlcoholToggle(false)}
-            activeOpacity={0.9}
-          >
-            <Text style={[s.toggleText, !isMocktailOnly && s.toggleTextActive]}>
-              Avec alcool
-            </Text>
-          </TouchableOpacity>
+                  ]}
+                  {...panResponder.panHandlers}
+                >
+                  <Pressable
+                    style={s.cardPressOverlay}
+                    onPress={() =>
+                      navigation.navigate("Details", {
+                        cocktailId: currentCocktail.id,
+                      })
+                    }
+                  />
 
-          <TouchableOpacity
-            style={s.toggleBtn}
-            onPress={() => handleAlcoholToggle(true)}
-            activeOpacity={0.9}
-          >
-            <Text style={[s.toggleText, isMocktailOnly && s.toggleTextActive]}>
-              Sans alcool
-            </Text>
-          </TouchableOpacity>
+                  <Image
+                    source={{ uri: currentCocktail.image }}
+                    style={s.cardImage}
+                  />
+                  <LinearGradient
+                    colors={["rgba(0,0,0,0)", "rgba(22,17,27,0.95)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={s.cardOverlay}
+                    pointerEvents="none"
+                  />
+
+                  {/* Stamps */}
+                  <Animated.View
+                    style={[s.stamp, s.stampNope, { opacity: nopeOpacity }]}
+                  >
+                    <Text style={[s.stampText, { color: colors.tertiaryContainer }]}>
+                      NOPE
+                    </Text>
+                  </Animated.View>
+                  <Animated.View
+                    style={[s.stamp, s.stampLike, { opacity: likeOpacity }]}
+                  >
+                    <Text style={[s.stampText, { color: colors.primary }]}>
+                      LIKE
+                    </Text>
+                  </Animated.View>
+
+                  {/* Badges */}
+                  <View style={s.badgeRow}>
+                    {currentCocktail.type ? (
+                      <Chip
+                        label={currentCocktail.type}
+                        variant="solid"
+                        style={s.badge}
+                      />
+                    ) : null}
+                    {currentCocktail.categorie ? (
+                      <Chip
+                        label={String(currentCocktail.categorie).toUpperCase()}
+                        variant="outline"
+                        uppercase
+                        style={s.badge}
+                      />
+                    ) : null}
+                  </View>
+
+                  {/* Info */}
+                  <View style={s.cardInfo} pointerEvents="none">
+                    <Text
+                      style={[typography.displayMd, s.cardTitle]}
+                      numberOfLines={2}
+                    >
+                      {currentCocktail.nom}
+                    </Text>
+                  </View>
+                </Animated.View>
+              </View>
+            )}
+          </View>
+
+          {/* ── Action buttons — straddling card bottom edge ── */}
+          {!loading && currentCocktail && (
+            <View style={s.actionsRow}>
+              <Pressable
+                onPress={swipeLeft}
+                style={({ pressed }) => [
+                  s.actionBtn,
+                  s.dislikeBtn,
+                  { transform: [{ scale: pressed ? 0.92 : 1 }] },
+                ]}
+              >
+                <X size={26} color={colors.tertiaryContainer} strokeWidth={2.5} />
+              </Pressable>
+
+              <Pressable
+                onPress={swipeRight}
+                style={({ pressed }) => [
+                  s.actionBtn,
+                  s.likeBtn,
+                  { transform: [{ scale: pressed ? 0.92 : 1 }] },
+                ]}
+              >
+                <Heart
+                  size={26}
+                  color={colors.onPrimary}
+                  strokeWidth={2.5}
+                  fill={colors.onPrimary}
+                />
+              </Pressable>
+            </View>
+          )}
         </View>
       </View>
-
-      {/* ── Loading ── */}
-      {loading && (
-        <View style={s.centered}>
-          <ActivityIndicator color="#ff8a00" size="large" />
-          <Text style={s.loadingText}>Chargement des cocktails...</Text>
-        </View>
-      )}
-
-      {/* ── End of stack ── */}
-      {!loading &&
-        !loadingMore &&
-        showEndMessage &&
-        currentIndex >= cocktails.length && (
-          <View style={s.centered}>
-            <View style={s.emptyCard}>
-              <Text style={s.emptyIcon}>🎉</Text>
-              <Text style={s.emptyTitle}>C'est tout pour l'instant</Text>
-              <Text style={s.emptyText}>
-                Tu as exploré tous les cocktails. Recharge pour en voir plus !
-              </Text>
-              <TouchableOpacity
-                style={s.reloadBtn}
-                onPress={loadInitialCocktails}
-                activeOpacity={0.92}
-              >
-                <LinearGradient
-                  colors={["#ff4fd8", "#ff2a6d", "#ff8a00"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.reloadGrad}
-                >
-                  <Text style={s.reloadIcon}>↺</Text>
-                  <Text style={s.reloadText}>Recharger</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-      {!loading && loadingMore && currentIndex >= cocktails.length && (
-        <View style={s.centered}>
-          <ActivityIndicator color="#ff8a00" size="large" />
-          <Text style={s.loadingText}>Chargement de nouveaux cocktails...</Text>
-        </View>
-      )}
-
-      {/* ── Card stack ── */}
-      {!loading && currentCocktail && (
-        <View style={s.cardContainer}>
-          {/* Next card (preview) */}
-          {cocktails[currentIndex + 1] && (
-            <View
-              style={[s.card, s.cardBehind]}
-              key={`next-${currentIndex + 1}`}
-            >
-              <Image
-                source={{ uri: cocktails[currentIndex + 1].image }}
-                style={s.cardImage}
-              />
-            </View>
-          )}
-
-          {/* Current card */}
-          <Animated.View
-            key={`current-${currentIndex}`}
-            style={[
-              s.card,
-              {
-                transform: [
-                  { translateX: pan.x },
-                  { translateY: pan.y },
-                  { rotate },
-                ],
-              },
-            ]}
-            {...panResponder.panHandlers}
-          >
-            <TouchableOpacity
-              style={s.cardPressOverlay}
-              activeOpacity={0.95}
-              onPress={() =>
-                navigation.navigate("Details", {
-                  cocktailId: currentCocktail.id,
-                })
-              }
-            />
-
-            <Image
-              source={{ uri: currentCocktail.image }}
-              style={s.cardImage}
-            />
-            <LinearGradient
-              colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.75)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={s.cardOverlay}
-            />
-
-            {/* NOPE stamp */}
-            <Animated.View
-              style={[s.stamp, s.stampNope, { opacity: nopeOpacity, left: 32 }]}
-            >
-              <Text style={[s.stampText, { color: "#ff2a6d" }]}>NOPE</Text>
-            </Animated.View>
-
-            {/* LIKE stamp */}
-            <Animated.View
-              style={[
-                s.stamp,
-                s.stampLike,
-                { opacity: likeOpacity, right: 32 },
-              ]}
-            >
-              <Text style={[s.stampText, { color: "#09bb0f" }]}>LIKE</Text>
-            </Animated.View>
-
-            {/* Badges */}
-            <View style={s.badgeRow}>
-              {currentCocktail.type && (
-                <View style={[s.badge, s.badgePink]}>
-                  <Text style={s.badgeText}>{currentCocktail.type}</Text>
-                </View>
-              )}
-              {currentCocktail.categorie && (
-                <View style={[s.badge, s.badgeAmber]}>
-                  <Text style={[s.badgeText, { color: "#ff8a00" }]}>
-                    {currentCocktail.categorie.toUpperCase()}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Info */}
-            <View style={s.cardInfo}>
-              <Text style={s.cardTitle} numberOfLines={2}>
-                {currentCocktail.nom}
-              </Text>
-            </View>
-          </Animated.View>
-        </View>
-      )}
-
-      {/* ── Action buttons ── */}
-      {!loading && currentCocktail && (
-        <View style={s.actionsRow}>
-          <TouchableOpacity
-            style={[s.actionBtn, s.dislikeBtn]}
-            onPress={handleDislikePress}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={["rgba(255,42,109,0.25)", "rgba(255,42,109,0.08)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.actionGrad}
-            >
-              <Text style={s.actionIcon}>✕</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[s.actionBtn, s.likeBtn]}
-            onPress={handleLikePress}
-            activeOpacity={0.9}
-          >
-            <LinearGradient
-              colors={["rgba(9,187,15,0.28)", "rgba(9,187,15,0.12)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.actionGrad}
-            >
-              <Text style={s.actionIcon}>♥</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      )}
-    </LinearGradient>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
-
-  headerBar: {
-    paddingTop: 56,
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-  headerSub: {
-    color: "rgba(255,216,244,0.6)",
-    fontSize: 12,
-    marginTop: 2,
-    fontWeight: "600",
-  },
-
-  toggleWrap: {
-    paddingHorizontal: 20,
-    marginBottom: 0,
-  },
-  toggleRow: {
-    position: "relative",
-    flexDirection: "row",
-    backgroundColor: "rgba(21,0,31,0.70)",
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.3)",
-    padding: 4,
-  },
-  slideIndicator: {
-    position: "absolute",
-    left: 4,
-    top: 4,
-    bottom: 4,
-    backgroundColor: "#ff2a6d",
-    borderRadius: 999,
-  },
-  toggleBtn: {
+  root: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 999,
-    alignItems: "center",
-    zIndex: 1,
+    backgroundColor: colors.background,
   },
-  toggleText: {
-    color: "rgba(255,216,244,0.55)",
-    fontWeight: "700",
-    fontSize: 14,
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.containerMargin,
+    paddingTop: spacing.xs,
+    paddingBottom: 110, // clearance tab bar flottante (~90 + marge)
   },
-  toggleTextActive: { color: "#fff" },
 
+  // Hero compact (sur une seule ligne pour économiser la verticale)
+  hero: {
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  heroTitle: {
+    color: colors.onSurface,
+    textAlign: "center",
+  },
+  heart: {
+    fontSize: 22,
+  },
+  heroSub: {
+    color: colors.onSurfaceVariant,
+    textAlign: "center",
+    marginTop: 2,
+  },
+
+  // States
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.lg,
   },
-
   loadingText: {
-    color: "rgba(255,216,244,0.75)",
-    fontWeight: "700",
-    marginTop: 12,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.sm,
   },
 
   emptyCard: {
-    backgroundColor: "rgba(21,0,31,0.60)",
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.35)",
-    padding: 24,
+    backgroundColor: colors.glassSurface,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorderStrong,
+    padding: spacing.lg,
     alignItems: "center",
   },
-  emptyIcon: { fontSize: 64, marginBottom: 16 },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
+  },
   emptyTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "900",
-    marginBottom: 8,
+    color: colors.onSurface,
+    marginBottom: 6,
   },
   emptyText: {
-    color: "rgba(255,216,244,0.7)",
-    fontSize: 13,
+    color: colors.onSurfaceVariant,
     textAlign: "center",
-    lineHeight: 20,
   },
 
-  reloadBtn: { marginTop: 18, borderRadius: 14, overflow: "hidden" },
-  reloadGrad: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    flexDirection: "row",
+  // Wrapper for card + straddling buttons
+  stackWrapper: {
+    flex: 1,
+  },
+  // Card stack — leaves room for half-button overlap at bottom
+  cardArea: {
+    flex: 1,
+    paddingBottom: 30, // half of button height (60/2) so buttons straddle the edge
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
   },
-  reloadIcon: { color: "#fff", fontSize: 16, fontWeight: "900" },
-  reloadText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 14,
-    letterSpacing: 0.4,
-  },
-
-  // ─── Card stack ─────────────────────────────────────────────────
   cardContainer: {
+    width: CARD_WIDTH,
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 20,
-    marginTop: -20,
   },
-
   card: {
     position: "absolute",
-    width: SCREEN_WIDTH - 40,
-    height: "75%",
-    borderRadius: 22,
+    width: CARD_WIDTH,
+    height: "100%",
+    borderRadius: radius.xxl,
     overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "rgba(255,79,216,0.4)",
-    backgroundColor: "rgba(21,0,31,0.85)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorderStrong,
+    backgroundColor: colors.glassSurface,
   },
-
   cardBehind: {
     opacity: 0.5,
     transform: [{ scale: 0.95 }],
   },
-
   cardImage: {
     width: "100%",
     height: "100%",
   },
-
   cardOverlay: {
     position: "absolute",
     left: 0,
@@ -771,126 +666,140 @@ const s = StyleSheet.create({
     top: 0,
     bottom: 0,
   },
-
   cardPressOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 20,
   },
 
-  // ─── Stamps ─────────────────────────────────────────────────────
+  // Stamps
   stamp: {
     position: "absolute",
     top: 48,
     borderWidth: 4,
     borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    transform: [{ rotate: "-18deg" }],
+    paddingVertical: 6,
+    paddingHorizontal: 14,
   },
   stampNope: {
-    borderColor: "#ff2a6d",
-    backgroundColor: "rgba(255,42,109,0.15)",
+    left: 24,
+    borderColor: colors.tertiaryContainer,
+    backgroundColor: "rgba(255, 79, 114, 0.15)",
+    transform: [{ rotate: "-18deg" }],
   },
   stampLike: {
-    borderColor: "#09bb0f",
-    backgroundColor: "rgba(9,187,15,0.15)",
+    right: 24,
+    borderColor: colors.primary,
+    backgroundColor: "rgba(221, 183, 255, 0.18)",
     transform: [{ rotate: "18deg" }],
   },
   stampText: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "900",
     letterSpacing: 2,
   },
 
-  // ─── Badges & Info ──────────────────────────────────────────────
+  // Badges over card
   badgeRow: {
     position: "absolute",
-    left: 16,
-    right: 16,
-    top: 16,
+    top: spacing.md,
+    left: spacing.md,
+    right: spacing.md,
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     flexWrap: "wrap",
   },
-
   badge: {
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderWidth: 1.5,
-  },
-  badgePink: {
-    backgroundColor: "rgba(255,42,109,0.25)",
-    borderColor: "#ff2a6d",
-  },
-  badgeAmber: {
-    backgroundColor: "rgba(255,138,0,0.25)",
-    borderColor: "#ff8a00",
-  },
-  badgeText: {
-    color: "#ff4fd8",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.2,
+    alignSelf: "auto",
   },
 
+  // Title under image
   cardInfo: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 20,
+    padding: spacing.lg,
   },
-
   cardTitle: {
     color: "#fff",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -0.3,
-    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowColor: "rgba(0,0,0,0.6)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
   },
 
-  // ─── Action buttons ─────────────────────────────────────────────
+  // Actions — absolutely centered, top half overlaps card bottom
   actionsRow: {
     position: "absolute",
-    bottom: 32,
+    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: spacing.xl,
+    zIndex: 10,
+  },
+  actionBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
-    gap: 28,
+  },
+  dislikeBtn: {
+    backgroundColor: colors.glassSurface,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  likeBtn: {
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
   },
 
-  actionBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+  // Next Match
+  nextMatchCard: {
+    backgroundColor: colors.glassSurface,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
     overflow: "hidden",
   },
-
-  dislikeBtn: {
-    borderWidth: 2,
-    borderColor: "#ff2a6d",
+  nextMatchInner: {
+    padding: spacing.md,
   },
-
-  likeBtn: {
-    borderWidth: 2,
-    borderColor: "#09bb0f",
-  },
-
-  actionGrad: {
-    width: "100%",
-    height: "100%",
+  nextMatchHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
+    marginBottom: spacing.sm,
   },
-
-  actionIcon: {
-    fontSize: 32,
-    color: "#fff",
-    fontWeight: "900",
+  nextMatchTitle: {
+    color: colors.primary,
+  },
+  nextMatchKicker: {
+    color: colors.onSurfaceVariant,
+  },
+  nextMatchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  nextMatchImage: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+  },
+  nextMatchBars: {
+    flex: 1,
+    gap: 6,
+  },
+  skeletonBar: {
+    height: 8,
+    backgroundColor: colors.surfaceContainerHigh,
+    borderRadius: 4,
   },
 });

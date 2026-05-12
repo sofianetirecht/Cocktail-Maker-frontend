@@ -5,6 +5,7 @@ const initialState = {
     token: null,
     username: null,
     email: null,
+    avatar: null, // require() result (number) or URI string
   },
 };
 
@@ -21,9 +22,13 @@ export const userSlice = createSlice({
       state.value.token = null;
       state.value.username = null;
       state.value.email = null;
+      state.value.avatar = null;
+    },
+    setAvatar: (state, action) => {
+      state.value.avatar = action.payload;
     },
   },
 });
 
-export const { login, logout } = userSlice.actions;
+export const { login, logout, setAvatar } = userSlice.actions;
 export default userSlice.reducer;

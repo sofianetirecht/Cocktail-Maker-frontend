@@ -2,26 +2,30 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
+  Image,
   StyleSheet,
   Alert,
   ActivityIndicator,
   ScrollView,
+  Pressable,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
+import { LogOut, Trash2, Heart, RotateCcw, Camera } from "lucide-react-native";
 import { useDispatch, useSelector } from "react-redux";
 
-import { logout } from "../reducers/user";
+import * as ImagePicker from "expo-image-picker";
+import { logout, setAvatar } from "../reducers/user";
 import { clearFavorites } from "../reducers/favorites";
+import { resetOnboarding } from "../reducers/app";
 import { api } from "../services/api";
+import { AppHeader } from "../components/ui";
+import { colors, radius, spacing, typography } from "../theme";
 
-export default function ProfileScreen() {
+
+export default function ProfileScreen({ navigation }) {
   const dispatch = useDispatch();
   const user = useSelector((state: any) => state.user.value);
-  const favoritesCount = useSelector(
-    (state: any) => state.favorites.value.length,
-  );
+  const favoritesCount = useSelector((state: any) => state.favorites.value.length);
   const [deleting, setDeleting] = useState(false);
 
   function handleLogout() {
@@ -41,7 +45,7 @@ export default function ProfileScreen() {
   function handleDeleteAccount() {
     Alert.alert(
       "Supprimer le compte",
-      "Cette action est irréversible. Toutes tes données (favoris, recettes IA) seront supprimées.",
+      "Cette action est irréversible. Toutes tes données seront supprimées.",
       [
         { text: "Annuler", style: "cancel" },
         {
@@ -64,124 +68,254 @@ export default function ProfileScreen() {
     );
   }
 
-  return (
-    <LinearGradient
-      colors={["#0d0014", "#2a0025", "#1a0020"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.container}
-    >
-      <StatusBar style="light" />
+  const initial = (user.username || "?").slice(0, 1).toUpperCase();
 
-      <ScrollView contentContainerStyle={s.scroll}>
-        <View style={s.header}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>
-              {(user.username || "?").slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
-          <Text style={s.username}>{user.username || "—"}</Text>
-          <Text style={s.email}>{user.email || ""}</Text>
+  async function pickFromGallery() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission refusée", "L'accès à la galerie est nécessaire.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled) dispatch(setAvatar({ uri: result.assets[0].uri }));
+  }
+
+  async function takePhoto() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission refusée", "L'accès à la caméra est nécessaire.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled) dispatch(setAvatar({ uri: result.assets[0].uri }));
+  }
+
+  function handleAvatarPress() {
+    const options: any[] = [
+      { text: "Prendre une photo", onPress: takePhoto },
+      { text: "Choisir dans la galerie", onPress: pickFromGallery },
+    ];
+    if (user.avatar) {
+      options.push({
+        text: "Retirer la photo",
+        style: "destructive",
+        onPress: () => dispatch(setAvatar(null)),
+      });
+    }
+    options.push({ text: "Annuler", style: "cancel" });
+    Alert.alert("Photo de profil", "Que veux-tu faire ?", options);
+  }
+
+  return (
+    <View style={s.root}>
+      <AppHeader
+        showHomeButton
+        onHomePress={() => navigation.navigate("MainTabs", { screen: "Home" })}
+      />
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Avatar */}
+        <View style={s.avatarWrap}>
+          <Pressable
+            onPress={handleAvatarPress}
+            style={s.avatarTouchable}
+          >
+            {user.avatar ? (
+              <Image source={user.avatar} style={s.avatarImage} />
+            ) : (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.avatar}
+              >
+                <Text style={[typography.displayMd, s.avatarText]}>{initial}</Text>
+              </LinearGradient>
+            )}
+            <View style={s.cameraOverlay}>
+              <Camera size={16} color="#fff" strokeWidth={2} />
+            </View>
+          </Pressable>
+          <Text style={[typography.headlineSm, s.username]}>
+            {user.username || "—"}
+          </Text>
+          <Text style={[typography.bodySm, s.email]}>{user.email || ""}</Text>
         </View>
 
+        {/* Stats */}
         <View style={s.statsCard}>
           <View style={s.statItem}>
-            <Text style={s.statValue}>{favoritesCount}</Text>
-            <Text style={s.statLabel}>Favoris</Text>
+            <Heart size={20} color={colors.primary} strokeWidth={2} style={{ marginBottom: 6 }} />
+            <Text style={[typography.headlineMd, s.statValue]}>{favoritesCount}</Text>
+            <Text style={[typography.labelSm, s.statLabel]}>Favoris</Text>
           </View>
         </View>
 
-        <TouchableOpacity
-          style={s.actionBtn}
-          onPress={handleLogout}
-          activeOpacity={0.85}
-        >
-          <Text style={s.actionIcon}>🚪</Text>
-          <Text style={s.actionText}>Se déconnecter</Text>
-        </TouchableOpacity>
+        {/* Actions */}
+        <View style={s.actions}>
+          <Pressable
+            style={({ pressed }) => [s.actionRow, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={handleLogout}
+          >
+            <View style={s.actionIcon}>
+              <LogOut size={20} color={colors.onSurfaceVariant} strokeWidth={1.8} />
+            </View>
+            <Text style={[typography.titleMd, s.actionText]}>Se déconnecter</Text>
+          </Pressable>
 
-        <TouchableOpacity
-          style={[s.actionBtn, s.actionBtnDanger]}
-          onPress={handleDeleteAccount}
-          disabled={deleting}
-          activeOpacity={0.85}
-        >
-          {deleting ? (
-            <ActivityIndicator color="#ff5577" />
-          ) : (
-            <>
-              <Text style={s.actionIcon}>🗑️</Text>
-              <Text style={[s.actionText, s.actionTextDanger]}>
-                Supprimer mon compte
+          <Pressable
+            style={({ pressed }) => [s.actionRow, s.actionDev, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => {
+              dispatch(logout());
+              dispatch(clearFavorites());
+              dispatch(resetOnboarding());
+            }}
+          >
+            <View style={[s.actionIcon, s.actionIconDev]}>
+              <RotateCcw size={20} color={colors.tertiary} strokeWidth={1.8} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[typography.titleMd, { color: colors.tertiary }]}>
+                Reset (dev)
               </Text>
-            </>
-          )}
-        </TouchableOpacity>
+              <Text style={[typography.labelSm, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
+                Vide le store et relance l'onboarding
+              </Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [s.actionRow, s.actionDanger, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={handleDeleteAccount}
+            disabled={deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator color={colors.tertiaryContainer} />
+            ) : (
+              <>
+                <View style={[s.actionIcon, s.actionIconDanger]}>
+                  <Trash2 size={20} color={colors.tertiaryContainer} strokeWidth={1.8} />
+                </View>
+                <Text style={[typography.titleMd, s.actionTextDanger]}>
+                  Supprimer mon compte
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
+const AVATAR_SIZE = 88;
+
 const s = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40 },
-  header: { alignItems: "center", marginBottom: 24 },
+  root: { flex: 1, backgroundColor: colors.background },
+  scroll: {
+    paddingHorizontal: spacing.containerMargin,
+    paddingTop: spacing.lg,
+    paddingBottom: 40,
+  },
+
+  avatarWrap: { alignItems: "center", marginBottom: spacing.xl },
+  avatarTouchable: {
+    marginBottom: spacing.md,
+    position: "relative",
+  },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,42,109,0.9)",
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+  },
+  avatarImage: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     borderWidth: 2,
-    borderColor: "rgba(255,79,216,0.6)",
+    borderColor: colors.primary,
   },
-  avatarText: { color: "#fff", fontSize: 38, fontWeight: "900" },
-  username: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: -0.3,
-  },
-  email: { color: "rgba(255,216,244,0.65)", marginTop: 4, fontSize: 14 },
-  statsCard: {
-    flexDirection: "row",
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    paddingVertical: 18,
-    marginBottom: 20,
+  avatarText: { color: "#fff" },
+  cameraOverlay: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.background,
   },
-  statItem: { alignItems: "center", flex: 1 },
-  statValue: { color: "#ff8a00", fontSize: 26, fontWeight: "900" },
+  username: { color: colors.onSurface },
+  email: { color: colors.onSurfaceVariant, marginTop: 4 },
+
+  statsCard: {
+    padding: spacing.lg,
+    alignItems: "center",
+    marginBottom: spacing.lg,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.xl,
+  },
+  statItem: { alignItems: "center" },
+  statValue: { color: colors.primary },
   statLabel: {
-    color: "rgba(255,216,244,0.7)",
-    fontSize: 11,
-    fontWeight: "800",
-    marginTop: 4,
-    letterSpacing: 0.6,
+    color: colors.onSurfaceVariant,
     textTransform: "uppercase",
+    letterSpacing: 1,
+    marginTop: 2,
   },
-  actionBtn: {
+
+  actions: { gap: spacing.sm },
+  actionRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginBottom: 12,
-    gap: 12,
+    gap: spacing.md,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
   },
-  actionBtnDanger: {
-    borderColor: "rgba(255,80,120,0.5)",
-    backgroundColor: "rgba(80,0,20,0.4)",
+  actionDev: {
+    borderColor: "rgba(255, 178, 186, 0.2)",
+    backgroundColor: "rgba(255, 178, 186, 0.05)",
+    borderStyle: "dashed",
   },
-  actionIcon: { fontSize: 18 },
-  actionText: { color: "#fff", fontWeight: "800", fontSize: 14 },
-  actionTextDanger: { color: "#ff5577" },
+  actionIconDev: {
+    backgroundColor: "rgba(255, 178, 186, 0.1)",
+  },
+  actionDanger: {
+    borderColor: "rgba(255, 79, 114, 0.25)",
+    backgroundColor: "rgba(255, 79, 114, 0.06)",
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceContainer,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionIconDanger: {
+    backgroundColor: "rgba(255, 79, 114, 0.12)",
+  },
+  actionText: { color: colors.onSurface, flex: 1 },
+  actionTextDanger: { color: colors.tertiaryContainer, flex: 1 },
 });

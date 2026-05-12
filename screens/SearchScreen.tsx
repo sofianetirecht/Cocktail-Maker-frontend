@@ -1,18 +1,20 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   StyleSheet,
   Text,
   View,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   FlatList,
   Image,
   ActivityIndicator,
   ScrollView,
   Keyboard,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
+import { Search, Plus, X } from "lucide-react-native";
+import { AppHeader, GlassCard, PrimaryButton } from "../components/ui";
+import { colors, radius, spacing, typography } from "../theme";
 
 const API_URL = "https://cocktail-maker-backend.onrender.com";
 
@@ -28,29 +30,16 @@ export default function SearchScreen({ navigation }) {
 
   const handleSearch = async () => {
     if (!ingredientTags.length) return;
-
     Keyboard.dismiss();
     setLoading(true);
-
     try {
-      const url = `${API_URL}/cocktail/match?ingredients=${encodeURIComponent(
-        ingredientTags.join(", "),
-      )}`;
-
+      const url = `${API_URL}/cocktail/match?ingredients=${encodeURIComponent(ingredientTags.join(", "))}`;
       const response = await fetch(url);
       const data = await response.json();
-
-      if (data.ok) {
-        setResults(data.results || []);
-        setSearched(true);
-      } else {
-        setResults([]);
-        setSearched(true);
-      }
-
-      // Vider les tags après la recherche
+      setResults(data.ok ? data.results || [] : []);
+      setSearched(true);
       setIngredientTags([]);
-    } catch (error) {
+    } catch {
       alert("Erreur de connexion au serveur");
       setResults([]);
       setSearched(true);
@@ -61,26 +50,12 @@ export default function SearchScreen({ navigation }) {
 
   function addTag() {
     if (!inputValue.trim()) return;
-
-    const parts = inputValue
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    if (parts.length === 0) return;
-
+    const parts = inputValue.split(",").map((t) => t.trim()).filter(Boolean);
     const next = [...ingredientTags];
-    parts.forEach((p) => {
-      if (!next.includes(p)) next.push(p);
-    });
-
+    parts.forEach((p) => { if (!next.includes(p)) next.push(p); });
     setIngredientTags(next);
     setInputValue("");
-
-    // Garde le focus
-    requestAnimationFrame(() => {
-      inputRef.current?.focus?.();
-    });
+    requestAnimationFrame(() => inputRef.current?.focus?.());
   }
 
   function removeTag(tag: string) {
@@ -89,421 +64,266 @@ export default function SearchScreen({ navigation }) {
 
   const renderCocktail = ({ item }: any) => {
     const score = Math.round(Number(item?.score || 0));
-
     return (
-      <TouchableOpacity
-        style={s.card}
-        activeOpacity={0.92}
-        onPress={() =>
-          navigation.navigate("Details", { cocktailId: item.idDrink })
-        }
+      <Pressable
+        style={({ pressed }) => [s.card, { opacity: pressed ? 0.88 : 1 }]}
+        onPress={() => navigation.navigate("Details", { cocktailId: item.idDrink })}
       >
-        <View style={s.cardMedia}>
-          <Image
-            source={{ uri: item?.drink?.strDrinkThumb }}
-            style={s.cardImage}
-          />
-          <LinearGradient
-            colors={["rgba(0,0,0,0.08)", "rgba(13,0,20,0.88)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={s.cardOverlay}
-          />
-
-          <View style={s.cardTopRow}>
-            <View style={s.scorePill}>
-              <Text style={s.scoreText}>{score}% MATCH</Text>
-            </View>
-          </View>
-
-          <View style={s.cardTitleBlock}>
-            <Text style={s.cardTitle} numberOfLines={2}>
-              {item?.name || "Cocktail"}
-            </Text>
-            <Text style={s.cardSub} numberOfLines={2}>
-              {Array.isArray(item?.matchedIngredients)
-                ? item.matchedIngredients.join(", ")
-                : "—"}
-            </Text>
+        <Image source={{ uri: item?.drink?.strDrinkThumb }} style={s.cardImage} />
+        <LinearGradient
+          colors={["rgba(0,0,0,0)", "rgba(22,17,27,0.95)"]}
+          start={{ x: 0, y: 0.3 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+        <View style={s.scoreRow}>
+          <View style={s.scorePill}>
+            <Text style={[typography.labelSm, s.scoreText]}>{score}% MATCH</Text>
           </View>
         </View>
-      </TouchableOpacity>
+        <View style={s.cardFooter}>
+          <Text style={[typography.titleMd, s.cardName]} numberOfLines={2}>
+            {item?.name || "Cocktail"}
+          </Text>
+          <Text style={[typography.labelSm, s.cardSub]} numberOfLines={1}>
+            {Array.isArray(item?.matchedIngredients)
+              ? item.matchedIngredients.join(", ")
+              : "—"}
+          </Text>
+        </View>
+      </Pressable>
     );
   };
 
   return (
-    <LinearGradient
-      colors={["#0d0014", "#2a0025", "#1a0020"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.container}
-    >
-      <StatusBar style="light" />
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={s.header}>
-          <Text style={s.title}>Recherche</Text>
-          <Text style={s.subtitle}>
-            Ajoute tes ingrédients séparés par des virgules.
+    <View style={s.root}>
+      <AppHeader
+        showHomeButton={false}
+        onAvatarPress={() => navigation.navigate("Profile")}
+      />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={s.pageHeader}>
+          <Text style={[typography.headlineMd, s.pageTitle]}>Recherche</Text>
+          <Text style={[typography.bodySm, s.pageSub]}>
+            Ajoute tes ingrédients pour trouver un cocktail.
           </Text>
         </View>
 
-        {/* Search box */}
-        <View style={s.searchCard}>
-          <Text style={s.label}>Ingrédients</Text>
+        <View style={s.inputCard}>
+          <Text style={[typography.labelMd, s.label]}>Ingrédients</Text>
 
-          <View style={s.tagBox}>
+          <View style={s.tagArea}>
             {ingredientTags.map((tag) => (
-              <TouchableOpacity
-                key={tag}
-                style={s.tag}
-                onPress={() => removeTag(tag)}
-                activeOpacity={0.9}
-              >
-                <Text style={s.tagText}>{tag}</Text>
-                <Text style={s.tagX}> ✕</Text>
-              </TouchableOpacity>
+              <Pressable key={tag} style={s.tag} onPress={() => removeTag(tag)}>
+                <Text style={[typography.labelSm, s.tagText]}>{tag}</Text>
+                <X size={12} color={colors.primary} strokeWidth={2.5} />
+              </Pressable>
             ))}
-
             <View style={s.inputRow}>
               <TextInput
                 ref={inputRef}
-                style={s.input}
-                placeholder="vodka, citron, menthe…"
-                placeholderTextColor="rgba(255,216,244,0.35)"
+                style={[typography.bodySm, s.input]}
+                placeholder={ingredientTags.length === 0 ? "vodka, citron, menthe…" : ""}
+                placeholderTextColor={colors.onSurfaceVariant}
                 value={inputValue}
                 onChangeText={setInputValue}
                 returnKeyType="done"
-                blurOnSubmit
-                onSubmitEditing={() => Keyboard.dismiss()}
+                onSubmitEditing={addTag}
               />
-
-              <TouchableOpacity
-                style={[s.addBtn, !inputValue.trim() && s.addBtnDisabled]}
+              <Pressable
                 onPress={addTag}
                 disabled={!inputValue.trim()}
-                activeOpacity={0.92}
+                style={({ pressed }) => [
+                  s.addBtn,
+                  !inputValue.trim() && s.addBtnDisabled,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
               >
-                <LinearGradient
-                  colors={
-                    inputValue.trim()
-                      ? ["rgba(255,79,216,0.22)", "rgba(255,79,216,0.08)"]
-                      : ["rgba(58,16,64,0.6)", "rgba(58,16,64,0.6)"]
-                  }
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.addBtnGrad}
-                >
-                  <Text style={s.addBtnText}>Ajouter</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                <Plus size={18} color={colors.primary} strokeWidth={2.5} />
+              </Pressable>
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[s.cta, !canSearch && s.ctaDisabled]}
+          <PrimaryButton
+            label="Trouver un cocktail"
             onPress={handleSearch}
             disabled={!canSearch}
-            activeOpacity={0.92}
-          >
-            <LinearGradient
-              colors={
-                canSearch
-                  ? ["#ff4fd8", "#ff2a6d", "#ff8a00"]
-                  : ["#3a1040", "#3a1040"]
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={s.ctaGrad}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Text style={s.ctaIcon}>✦</Text>
-                  <Text style={s.ctaText}>Trouver un cocktail</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+            loading={loading}
+            icon={<Search size={18} color="#fff" strokeWidth={2} />}
+            size="md"
+          />
         </View>
 
-        {/* States */}
         {loading && (
-          <View style={s.loaderWrap}>
-            <ActivityIndicator size="large" color="#ff4fd8" />
-            <Text style={s.loaderText}>Recherche en cours…</Text>
+          <View style={s.stateWrap}>
+            <ActivityIndicator color={colors.primary} size="large" />
+            <Text style={[typography.bodySm, s.stateText]}>Recherche en cours…</Text>
           </View>
         )}
 
         {!loading && searched && results.length === 0 && (
-          <View style={s.emptyWrap}>
-            <View style={s.emptyCard}>
-              <Text style={s.emptyIcon}>😕</Text>
-              <Text style={s.emptyTitle}>Aucun résultat</Text>
-              <Text style={s.emptyText}>
-                Essaie avec d’autres ingrédients (ou moins d’ingrédients).
-              </Text>
-            </View>
-          </View>
+          <GlassCard style={s.emptyCard}>
+            <Text style={s.emptyIcon}>😕</Text>
+            <Text style={[typography.headlineSm, s.emptyTitle]}>Aucun résultat</Text>
+            <Text style={[typography.bodySm, s.emptyText]}>
+              Essaie avec d'autres ingrédients (ou moins d'ingrédients).
+            </Text>
+          </GlassCard>
         )}
 
         {!loading && results.length > 0 && (
           <View style={s.resultsWrap}>
             <View style={s.resultsHeader}>
-              <Text style={s.resultsTitle}>Résultats</Text>
-              <Text style={s.resultsCount}>
+              <Text style={[typography.labelLg, s.resultsTitle]}>Résultats</Text>
+              <Text style={[typography.labelMd, { color: colors.onSurfaceVariant }]}>
                 {results.length} cocktail{results.length > 1 ? "s" : ""}
               </Text>
             </View>
-
             <FlatList
               data={results}
               renderItem={renderCocktail}
               keyExtractor={(item: any) => String(item.idDrink)}
               scrollEnabled={false}
-              contentContainerStyle={{ gap: 12, paddingBottom: 26 }}
+              contentContainerStyle={{ gap: spacing.sm }}
             />
           </View>
         )}
 
-        <View style={{ height: 26 }} />
+        <View style={{ height: 110 }} />
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
+  root: { flex: 1, backgroundColor: colors.background },
+  scroll: { paddingHorizontal: spacing.containerMargin },
 
-  header: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+  pageHeader: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     alignItems: "center",
   },
-  title: {
-    color: "#fff",
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -0.3,
-    textAlign: "center",
-  },
-  subtitle: {
-    color: "rgba(255,216,244,0.65)",
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 6,
-    letterSpacing: 0.3,
-  },
+  pageTitle: { color: colors.onSurface },
+  pageSub: { color: colors.onSurfaceVariant, marginTop: 4, textAlign: "center" },
 
-  searchCard: {
-    marginTop: 8,
-    marginHorizontal: 20,
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    padding: 16,
+  inputCard: {
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.xl,
   },
-
   label: {
-    color: "#ffd8f4",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.2,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.xs,
     textTransform: "uppercase",
-    marginBottom: 10,
+    letterSpacing: 1,
   },
 
-  tagBox: {
+  tagArea: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    backgroundColor: "rgba(21,0,31,0.55)",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.45)",
-    padding: 10,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.outlineVariant,
+    padding: spacing.sm,
     minHeight: 52,
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: spacing.md,
   },
   tag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,79,216,0.18)",
-    borderRadius: 999,
+    gap: 6,
+    backgroundColor: colors.glassFill,
+    borderRadius: radius.pill,
     paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "#ff4fd8",
+    paddingHorizontal: spacing.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primary,
   },
-  tagText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-  tagX: { color: "#ff4fd8", fontSize: 11, fontWeight: "900" },
+  tagText: { color: colors.onSurface },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    flexGrow: 1,
-    minWidth: 170,
-  },
-  input: {
     flex: 1,
-    minWidth: 110,
-    color: "#fff",
-    fontSize: 13,
-    paddingVertical: 2,
+    minWidth: 140,
+    gap: 8,
   },
+  input: { flex: 1, color: colors.onSurface, paddingVertical: 2 },
   addBtn: {
-    borderRadius: 999,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#ff4fd8",
-  },
-  addBtnDisabled: { opacity: 0.5 },
-  addBtnGrad: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  addBtnText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-
-  cta: {
-    marginTop: 14,
-    borderRadius: 18,
-    overflow: "hidden",
-  },
-  ctaDisabled: { opacity: 0.45 },
-  ctaGrad: {
-    height: 54,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.glassFill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
   },
-  ctaIcon: { color: "#fff", fontSize: 16 },
-  ctaText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 15,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
+  addBtnDisabled: { opacity: 0.3 },
 
-  loaderWrap: {
-    marginTop: 18,
+  stateWrap: {
     alignItems: "center",
-    gap: 10,
+    gap: spacing.sm,
+    paddingTop: spacing.lg,
   },
-  loaderText: {
-    color: "rgba(255,216,244,0.65)",
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
+  stateText: { color: colors.onSurfaceVariant },
 
-  emptyWrap: { paddingHorizontal: 20, paddingTop: 18 },
   emptyCard: {
-    backgroundColor: "rgba(21,0,31,0.65)",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    paddingVertical: 24,
-    paddingHorizontal: 18,
+    padding: spacing.xl,
     alignItems: "center",
+    marginTop: spacing.sm,
   },
-  emptyIcon: { fontSize: 54, marginBottom: 10 },
-  emptyTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
-  emptyText: {
-    marginTop: 6,
-    color: "rgba(255,216,244,0.75)",
-    textAlign: "center",
-    lineHeight: 20,
-    fontWeight: "700",
-    fontSize: 13,
-  },
+  emptyIcon: { fontSize: 48, marginBottom: spacing.sm },
+  emptyTitle: { color: colors.onSurface, marginBottom: spacing.xs },
+  emptyText: { color: colors.onSurfaceVariant, textAlign: "center" },
 
-  resultsWrap: { paddingTop: 18, paddingHorizontal: 20 },
+  resultsWrap: { paddingTop: spacing.sm },
   resultsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: 12,
+    alignItems: "center",
+    marginBottom: spacing.sm,
   },
   resultsTitle: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 0.8,
+    color: colors.onSurface,
     textTransform: "uppercase",
-  },
-  resultsCount: {
-    color: "rgba(255,216,244,0.65)",
-    fontSize: 12,
-    fontWeight: "800",
+    letterSpacing: 1,
   },
 
-  // Card
   card: {
-    borderRadius: 22,
+    height: 190,
+    borderRadius: radius.xl,
     overflow: "hidden",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,79,216,0.30)",
-    backgroundColor: "rgba(21,0,31,0.60)",
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
   },
-  cardMedia: { height: 190, backgroundColor: "#12001a" },
   cardImage: { width: "100%", height: "100%" },
-  cardOverlay: { ...StyleSheet.absoluteFillObject },
-
-  cardTopRow: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    right: 12,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-  },
-
+  scoreRow: { position: "absolute", top: spacing.sm, right: spacing.sm },
   scorePill: {
-    backgroundColor: "rgba(255,138,0,0.18)",
+    backgroundColor: "rgba(221,183,255,0.15)",
     borderWidth: 1,
-    borderColor: "rgba(255,138,0,0.65)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
   },
-  scoreText: {
-    color: "#ff8a00",
-    fontWeight: "900",
-    fontSize: 11,
-    letterSpacing: 0.8,
-  },
-
-  cardTitleBlock: {
+  scoreText: { color: colors.primary, letterSpacing: 0.5 },
+  cardFooter: {
     position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 12,
+    left: spacing.md,
+    right: spacing.md,
+    bottom: spacing.md,
   },
-  cardTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-    lineHeight: 22,
-  },
-  cardSub: {
-    marginTop: 6,
-    color: "rgba(255,216,244,0.75)",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 18,
-  },
+  cardName: { color: "#fff", marginBottom: 4 },
+  cardSub: { color: "rgba(255,255,255,0.6)" },
 });

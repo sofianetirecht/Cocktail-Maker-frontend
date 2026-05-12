@@ -5,8 +5,9 @@ import { combineReducers } from "redux";
 
 import favorites from "./favorites";
 import user from "./user";
+import app from "./app";
 
-const reducers = combineReducers({ favorites, user });
+const reducers = combineReducers({ favorites, user, app });
 
 const persistConfig = {
   key: "cocktailmaker",
