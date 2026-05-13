@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/cocktail.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,12 +15,15 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.bannersoso.cocktailmaker",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Cocktail Maker utilise l'appareil photo pour personnaliser ta photo de profil.",
+        "NSPhotoLibraryUsageDescription": "Cocktail Maker accède à ta galerie pour choisir une photo de profil."
       }
     },
     "android": {
       "package": "com.bannersoso.cocktailmaker",
       "softwareKeyboardLayoutMode": "pan",
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "READ_EXTERNAL_STORAGE"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/cocktail.png",
         "backgroundColor": "#2a0b2e"

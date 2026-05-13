@@ -15,6 +15,7 @@ type Props = {
   intensity?: number;
   borderRadius?: number;
   variant?: "default" | "strong" | "subtle";
+  noBorder?: boolean;
 };
 
 export function GlassCard({
@@ -23,6 +24,7 @@ export function GlassCard({
   intensity = 40,
   borderRadius = radius.xl,
   variant = "default",
+  noBorder = false,
 }: Props) {
   const fill =
     variant === "strong"
@@ -43,7 +45,8 @@ export function GlassCard({
           {
             borderRadius,
             backgroundColor: colors.glassSurface,
-            borderColor: border,
+            borderColor: noBorder ? "transparent" : border,
+            borderWidth: noBorder ? 0 : StyleSheet.hairlineWidth,
           },
           style,
         ]}
@@ -66,8 +69,8 @@ export function GlassCard({
       <View
         style={{
           borderRadius,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: border,
+          borderWidth: noBorder ? 0 : StyleSheet.hairlineWidth,
+          borderColor: noBorder ? "transparent" : border,
           flex: 1,
         }}
       >

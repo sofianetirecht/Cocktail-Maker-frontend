@@ -46,6 +46,8 @@ export default function SurpriseScreen({ navigation }) {
 
   const pan = useRef(new Animated.ValueXY()).current;
   const swipeDirection = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const toastAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadInitialCocktails();
@@ -276,6 +278,7 @@ export default function SurpriseScreen({ navigation }) {
             type: activeCocktail.type,
           })
         );
+        triggerFavoriteAnimation();
       }
       nextCard();
     });
@@ -333,6 +336,35 @@ export default function SurpriseScreen({ navigation }) {
       );
     })();
   }, [currentIndex, cocktails.length, loading]);
+
+  const floatHeartOpacity = floatAnim.interpolate({
+    inputRange: [0, 0.15, 0.75, 1],
+    outputRange: [0, 1, 1, 0],
+  });
+  const floatHeartY = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -90],
+  });
+  const toastTranslateY = toastAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 0],
+  });
+
+  function triggerFavoriteAnimation() {
+    floatAnim.setValue(0);
+    Animated.timing(floatAnim, {
+      toValue: 1,
+      duration: 700,
+      useNativeDriver: true,
+    }).start(() => floatAnim.setValue(0));
+
+    toastAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1300),
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start();
+  }
 
   const rotate = pan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
@@ -523,6 +555,29 @@ export default function SurpriseScreen({ navigation }) {
               </View>
             )}
           </View>
+
+          {/* ── Floating heart on like ── */}
+          <Animated.View
+            style={[
+              s.floatHeart,
+              { opacity: floatHeartOpacity, transform: [{ translateY: floatHeartY }] },
+            ]}
+            pointerEvents="none"
+          >
+            <Heart size={72} color={colors.primary} fill={colors.primary} strokeWidth={0} />
+          </Animated.View>
+
+          {/* ── Toast "Ajouté aux favoris" ── */}
+          <Animated.View
+            style={[
+              s.toast,
+              { opacity: toastAnim, transform: [{ translateY: toastTranslateY }] },
+            ]}
+            pointerEvents="none"
+          >
+            <Heart size={13} color={colors.primary} fill={colors.primary} strokeWidth={0} />
+            <Text style={s.toastText}>Ajouté aux favoris</Text>
+          </Animated.View>
 
           {/* ── Action buttons — straddling card bottom edge ── */}
           {!loading && currentCocktail && (
@@ -758,6 +813,33 @@ const s = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 0 },
     elevation: 8,
+  },
+
+  floatHeart: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "35%",
+    zIndex: 20,
+  },
+  toast: {
+    position: "absolute",
+    bottom: 72,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    zIndex: 20,
+  },
+  toastText: {
+    color: colors.onSurface,
+    fontSize: 13,
+    fontWeight: "500",
   },
 
   // Next Match

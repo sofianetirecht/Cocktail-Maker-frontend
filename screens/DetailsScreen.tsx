@@ -8,6 +8,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import { LinearGradient } from "expo-linear-gradient";
 import { Heart } from "lucide-react-native";
@@ -85,21 +86,21 @@ export default function DetailsScreen({ route, navigation }) {
   // ── Loading ──
   if (loading) {
     return (
-      <View style={[s.root, s.centered]}>
+      <SafeAreaView style={[s.root, s.centered]}>
         <GlassCard style={s.stateCard}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[typography.bodySm, s.stateText]}>
             Chargement de la recette…
           </Text>
         </GlassCard>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // ── Not found ──
   if (!isAI && !cocktail) {
     return (
-      <View style={[s.root, s.centered]}>
+      <SafeAreaView style={[s.root, s.centered]}>
         <GlassCard style={s.stateCard}>
           <Text style={[typography.headlineSm, { color: colors.onSurface }]}>
             Introuvable
@@ -108,7 +109,7 @@ export default function DetailsScreen({ route, navigation }) {
             Cocktail non trouvé.
           </Text>
         </GlassCard>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -116,7 +117,7 @@ export default function DetailsScreen({ route, navigation }) {
   if (isAI) {
     const r = aiRecipe.recipe;
     return (
-      <View style={s.root}>
+      <SafeAreaView style={s.root} edges={["bottom"]}>
         <AppHeader
           showHomeButton
           onHomePress={() => navigation.goBack()}
@@ -173,7 +174,6 @@ export default function DetailsScreen({ route, navigation }) {
                   key={idx}
                   name={safeText(it?.name)}
                   amount={safeText(it?.amount)}
-                  last={idx === r.ingredients.length - 1}
                 />
               ))}
           </SectionCard>
@@ -204,13 +204,18 @@ export default function DetailsScreen({ route, navigation }) {
 
           <View style={{ height: 110 }} />
         </ScrollView>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // ── API cocktail ──
   return (
-    <View style={s.root}>
+    <SafeAreaView style={s.root} edges={["bottom"]}>
+      <AppHeader
+        showHomeButton
+        onHomePress={() => navigation.goBack()}
+        onAvatarPress={() => navigation.navigate("Profile")}
+      />
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Hero image */}
         <View style={s.imageWrap}>
@@ -222,18 +227,6 @@ export default function DetailsScreen({ route, navigation }) {
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
-          {/* Back button */}
-          <Pressable
-            style={({ pressed }) => [s.backBtn, { opacity: pressed ? 0.7 : 1 }]}
-            onPress={() => navigation.goBack()}
-            hitSlop={10}
-          >
-            <AppHeader
-              showHomeButton
-              onHomePress={() => navigation.goBack()}
-              onAvatarPress={() => navigation.navigate("Profile")}
-            />
-          </Pressable>
 
           <View style={s.imageTopRow}>
             <View style={s.badgeRow}>
@@ -284,7 +277,6 @@ export default function DetailsScreen({ route, navigation }) {
                   key={index}
                   name={safeText(ing?.nom)}
                   amount={safeText(ing?.quantite)}
-                  last={index === cocktail.ingredients.length - 1}
                 />
               ))}
           </SectionCard>
@@ -308,7 +300,7 @@ export default function DetailsScreen({ route, navigation }) {
           <View style={{ height: 110 }} />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -316,16 +308,16 @@ export default function DetailsScreen({ route, navigation }) {
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <GlassCard style={sc.card}>
+    <GlassCard style={sc.card} noBorder>
       <Text style={[typography.labelLg, sc.title]}>{title}</Text>
       {children}
     </GlassCard>
   );
 }
 
-function IngredientRow({ name, amount, last }: { name: string; amount: string; last: boolean }) {
+function IngredientRow({ name, amount }: { name: string; amount: string }) {
   return (
-    <View style={[sc.row, !last && sc.rowBorder]}>
+    <View style={sc.row}>
       <View style={sc.dot} />
       <Text style={[typography.bodySm, sc.rowName]} numberOfLines={1}>{name}</Text>
       <Text style={[typography.labelMd, sc.rowAmount]} numberOfLines={1}>{amount}</Text>
@@ -365,10 +357,6 @@ const sc = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
     gap: spacing.sm,
-  },
-  rowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.outlineVariant,
   },
   dot: {
     width: 6,
@@ -438,10 +426,9 @@ const s = StyleSheet.create({
   // API hero image
   imageWrap: { height: 340, backgroundColor: colors.surfaceContainerLow },
   image: { width: "100%", height: "100%" },
-  backBtn: { position: "absolute", top: 0, left: 0, right: 0 },
   imageTopRow: {
     position: "absolute",
-    top: 20,
+    top: 12,
     left: spacing.containerMargin,
     right: spacing.containerMargin,
     flexDirection: "row",
